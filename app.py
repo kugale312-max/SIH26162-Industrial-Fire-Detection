@@ -11,7 +11,7 @@ from streamlit_folium import st_folium
 # =========================================================
 
 st.set_page_config(
-    page_title="SIH26162 Industrial Fire Detection",
+    page_title="FireSight AI - AI-Powered Industrial Fire & Thermal Source Monitoring",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -61,10 +61,10 @@ st.markdown("""
 
     .console-header {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
         border-bottom: 1px solid #202a38;
-        padding-bottom: 14px;
+        padding-bottom: 16px;
         margin-bottom: 22px;
     }
 
@@ -77,8 +77,14 @@ st.markdown("""
 
     .console-subtitle {
         font-size: 13px;
-        color: #56607f;
-        margin-top: 3px;
+        color: #6a768f;
+        margin-top: 4px;
+    }
+
+    .console-header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
     .console-live {
@@ -87,14 +93,38 @@ st.markdown("""
         color: #2fd0a6;
         border: 1px solid #1c3a34;
         background: #0d1a17;
-        padding: 5px 10px;
-        border-radius: 3px;
+        padding: 5px 12px;
+        border-radius: 4px;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
     .console-live::before {
         content: "●";
-        margin-right: 6px;
+        color: #2fd0a6;
+        font-size: 11px;
+    }
+
+    .deploy-badge {
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: #8b96aa;
+        border: 1px solid #202a38;
+        background: #0e131b;
+        padding: 5px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+
+    .deploy-badge:hover {
+        color: #e7edf6;
+        border-color: #4c8dff;
+        background: #131a24;
     }
 
     /* ---------- keyframe animations ---------- */
@@ -117,10 +147,13 @@ st.markdown("""
         background: #0e131b;
         border: 1px solid #202a38;
         border-left: 3px solid var(--accent, #4c8dff);
-        border-radius: 4px;
+        border-radius: 6px;
         padding: 16px 18px;
         min-height: 104px;
         transition: border-color 0.3s;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 
     .metric-card.danger {
@@ -131,7 +164,7 @@ st.markdown("""
         color: #8b96aa;
         font-size: 13px;
         font-weight: 500;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
 
     .metric-value {
@@ -147,6 +180,21 @@ st.markdown("""
         font-size: 11.5px;
         margin-top: 8px;
         font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .health-bar-container {
+        width: 100%;
+        height: 4px;
+        background: #17202d;
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .health-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #ff9f1c, #ff3b46);
     }
 
     /* ---------- section headers ---------- */
@@ -449,6 +497,24 @@ st.markdown("""
 
     hr {
         border-color: #171f2b;
+    }
+
+    /* sidebar nav title */
+    .sidebar-nav-header {
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #8b96aa;
+        margin: 14px 0 8px 2px;
+    }
+
+    /* filter status text */
+    .filter-status-text {
+        color: #8b96aa;
+        font-size: 12.5px;
+        font-family: 'IBM Plex Mono', monospace;
+        margin: 8px 0 14px 2px;
     }
 
     /* sidebar radio pills */
@@ -1061,20 +1127,23 @@ with st.sidebar:
     st.markdown(
         """
         <div class="sidebar-brand">
-            <div class="sidebar-brand-mark">🛰️🔥</div>
-            <div class="sidebar-brand-title">SIH26162</div>
-            <div class="sidebar-brand-sub">Industrial Fire Detection</div>
+            <div class="sidebar-brand-mark">🔥</div>
+            <div class="sidebar-brand-title">FireSight AI</div>
+            <div class="sidebar-brand-sub">AI-Powered Industrial Fire & Thermal Source Monitoring</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
+    st.markdown('<div class="sidebar-nav-header">Navigation</div>', unsafe_allow_html=True)
+
     page = st.radio(
         "Navigation",
         [
-            "📊 Overview",
-            "📋 Detection Records",
-            "⚙️ System Info"
+            "Overview",
+            "Hotspot Analysis",
+            "Detection Records",
+            "System Info"
         ],
         label_visibility="collapsed"
     )
@@ -1109,7 +1178,7 @@ with st.sidebar:
         """
         <div class="sidebar-caption">
         Proof-of-concept<br>
-        FIRMS · historical FRP · OSM · random forest
+        NASA - Sentinel/ISRO - OSM - Random forest
         </div>
         """,
         unsafe_allow_html=True
@@ -1134,7 +1203,9 @@ st.markdown(
             <div class="console-title">Industrial Fire &amp; Persistent Thermal Source Detection</div>
             <div class="console-subtitle">NASA FIRMS &middot; historical thermal baseline &middot; OpenStreetMap &middot; AI classification</div>
         </div>
-        <div class="console-live">LIVE &middot; {_now_ist}</div>
+        <div class="console-header-right">
+            <div class="console-live">LIVE &middot; {_now_ist}</div>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
@@ -1166,30 +1237,40 @@ high_risk = (
 
 
 
-# Render all 4 metric cards in a single responsive flex row
+# Render all 4 metric cards matching the design in the picture
 _danger_class = " danger" if high_risk > 0 else ""
 st.markdown(
     f"""
-    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
-        <div class="metric-card" style="--accent:{OSM_COLOR};flex:1;min-width:160px;">
-            <div class="metric-label">India active hotspots</div>
-            <div class="metric-value">{total_hotspots}</div>
-            <div class="metric-footnote">NASA FIRMS · latest 1 day</div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;">
+        <div class="metric-card" style="--accent:{OSM_COLOR};flex:1;min-width:180px;">
+            <div>
+                <div class="metric-label">India active hotspots</div>
+                <div class="metric-value">{total_hotspots}</div>
+            </div>
+            <div class="metric-footnote">NASA FIRMS &middot; latest 1 day</div>
         </div>
-        <div class="metric-card" style="--accent:{class_color('Industrial Fire')};flex:1;min-width:160px;">
-            <div class="metric-label">AI-flagged industrial fires</div>
-            <div class="metric-value">{industrial_fires}</div>
+        <div class="metric-card" style="--accent:{class_color('Industrial Fire')};flex:1;min-width:180px;">
+            <div>
+                <div class="metric-label">AI-flagged industrial fires</div>
+                <div class="metric-value">{industrial_fires}</div>
+            </div>
             <div class="metric-footnote">predicted events</div>
         </div>
-        <div class="metric-card" style="--accent:{class_color('Gas Flare')};flex:1;min-width:160px;">
-            <div class="metric-label">Gas flares &amp; mining</div>
-            <div class="metric-value">{persistent_sources}</div>
+        <div class="metric-card" style="--accent:#f2a93b;flex:1;min-width:180px;">
+            <div>
+                <div class="metric-label">Gas flares &amp; mining</div>
+                <div class="metric-value">{persistent_sources}</div>
+            </div>
             <div class="metric-footnote">persistent thermal sources</div>
         </div>
-        <div class="metric-card{_danger_class}" style="--accent:{risk_color('HIGH')};flex:1;min-width:160px;">
-            <div class="metric-label">High risk events</div>
-            <div class="metric-value">{high_risk}</div>
-            <div class="metric-footnote">risk score &ge; 70</div>
+        <div class="metric-card{_danger_class}" style="--accent:{risk_color('HIGH')};flex:1;min-width:180px;">
+            <div>
+                <div class="metric-label">High risk events</div>
+                <div class="metric-value">{high_risk}</div>
+            </div>
+            <div>
+                <div class="metric-footnote">risk score &ge; 70</div>
+            </div>
         </div>
     </div>
     """,
@@ -1197,9 +1278,6 @@ st.markdown(
 )
 
 
-
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 
 # =========================================================
@@ -1250,9 +1328,10 @@ filtered_data = data[
     & data["Risk Level"].isin(selected_risks)
 ].copy()
 
-st.caption(
-    f"{'📍 ' + selected_state if selected_state != 'All India' else '🇮🇳 All India'}  ·  "
-    f"Showing {len(filtered_data)} of {len(data)} AI-assessed hotspots"
+st.markdown(
+    f'<div class="filter-status-text">🇮🇳 {selected_state} &nbsp;&middot;&nbsp; '
+    f'Showing {len(filtered_data)} of {len(data)} AI assessed hotspots</div>',
+    unsafe_allow_html=True
 )
 
 if len(filtered_data) == 0:
@@ -1270,10 +1349,10 @@ if "selected_india_hotspot" not in st.session_state:
     st.session_state.selected_india_hotspot = None
 
 # =========================================================
-# OVERVIEW
+# DASHBOARD / OVERVIEW
 # =========================================================
 
-if "Overview" in page:
+if "Dashboard" in page or "Overview" in page:
 
     st.markdown(
         """
@@ -1635,22 +1714,142 @@ if "Overview" in page:
             unsafe_allow_html=True
         )
 
-    # ---------------------------------------------------------
-    # Select an India FIRMS hotspot for detailed inspection.
-    # ---------------------------------------------------------
-    if len(india_firms) > 0:
+    # Legend
+    st.markdown(
+        f"""
+        <div class="legend-strip">
+            <span><span class="legend-dot" style="background:{class_color('Industrial Fire')}"></span>Industrial fire</span>
+            <span><span class="legend-dot" style="background:{class_color('Gas Flare')}"></span>Gas flare</span>
+            <span><span class="legend-dot" style="background:{class_color('Forest / Wildfire')}"></span>Forest / Wildfire</span>
+            <span><span class="legend-dot" style="background:{class_color('Agricultural Burning')}"></span>Agricultural burning</span>
+            <span><span class="legend-dot" style="background:{class_color('Mining Activity')}"></span>Mining activity</span>
+            <span><span class="legend-dot" style="background:{class_color('Other Thermal Event')}"></span>Other thermal event</span>
+            <span><span class="legend-dot" style="background:{OSM_COLOR}"></span>OSM industrial location</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Analytics
+    a1, a2 = st.columns(2)
+
+    with a1:
 
         st.markdown(
             """
             <div class="section-head">
-                <div class="section-title">Selected hotspot analysis</div>
-                <div class="section-tag">FIRMS → AI DECISION SUPPORT</div>
+                <div class="section-title">Classification distribution</div>
             </div>
             """,
             unsafe_allow_html=True
         )
+
+        counts = data[
+            "AI Classification"
+        ].value_counts()
+
+        render_donut(
+            counts,
+            CLASS_COLOR,
+            key="classification_donut"
+        )
+
+        if len(india_firms) > 0:
+            st.caption(
+                f"India overview: {len(india_firms)} current FIRMS hotspots; "
+                f"AI predictions available for {len(data)} validated India hotspots."
+            )
+
+    with a2:
+
+        st.markdown(
+            """
+            <div class="section-head">
+                <div class="section-title">Risk distribution</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        risk_counts = data[
+            "Risk Level"
+        ].value_counts()
+
+        render_donut(
+            risk_counts,
+            RISK_COLOR,
+            key="risk_donut"
+        )
+
+    # ---------------------------------------------------------
+    # Top States by industrial fire count
+    # ---------------------------------------------------------
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-title">Top states by detection count</div>
+            <div class="section-tag">AI PREDICTIONS · ALL CLASSES</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if "state" in data.columns and len(data) > 0:
+        state_counts = (
+            data.groupby("state")["AI Classification"]
+            .count()
+            .reset_index()
+            .rename(columns={"AI Classification": "Detections"})
+            .sort_values("Detections", ascending=False)
+            .head(10)
+            .set_index("state")
+        )
+
+        # Industrial fires per state
+        industrial_by_state = (
+            data[data["AI Classification"] == "Industrial Fire"]
+            .groupby("state")
+            .size()
+            .rename("Industrial Fires")
+        )
+
+        state_chart = state_counts.join(industrial_by_state, how="left").fillna(0)
+        state_chart["Industrial Fires"] = state_chart["Industrial Fires"].astype(int)
+
+        st.bar_chart(
+            state_chart,
+            use_container_width=True,
+            height=280,
+            color=["#4c8dff", "#ff5a3c"]
+        )
+        st.caption(
+            "Blue = all detections · Red = industrial fires only · "
+            "Top 10 states shown"
+        )
+    else:
+        st.info("State breakdown not available — no data after current filters.")
+
+
+# =========================================================
+# HEATMAP & HOTSPOT ANALYSIS PAGE
+# =========================================================
+
+elif "Heatmap Analysis" in page or "Hotspot Analysis" in page:
+
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-title">Heatmap &amp; Selected Hotspot Analysis</div>
+            <div class="section-tag">FIRMS &rarr; AI DECISION SUPPORT</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if len(india_firms) > 0:
 
         hotspot_options = list(range(len(india_firms)))
 
@@ -2016,8 +2215,6 @@ if "Overview" in page:
                 "no class is marked as detected when source data is unavailable."
             )
 
-
-
         st.markdown(
             """
             <div class="limitation-panel">
@@ -2065,137 +2262,110 @@ if "Overview" in page:
                 """,
                 unsafe_allow_html=True
             )
+    else:
+        st.info("No hotspots available for the current filter.")
 
-    # Legend
-    st.markdown(
-        f"""
-        <div class="legend-strip">
-            <span><span class="legend-dot" style="background:{class_color('Industrial Fire')}"></span>Industrial fire</span>
-            <span><span class="legend-dot" style="background:{class_color('Gas Flare')}"></span>Gas flare</span>
-            <span><span class="legend-dot" style="background:{class_color('Forest / Wildfire')}"></span>Forest / Wildfire</span>
-            <span><span class="legend-dot" style="background:{class_color('Agricultural Burning')}"></span>Agricultural burning</span>
-            <span><span class="legend-dot" style="background:{class_color('Mining Activity')}"></span>Mining activity</span>
-            <span><span class="legend-dot" style="background:{class_color('Other Thermal Event')}"></span>Other thermal event</span>
-            <span><span class="legend-dot" style="background:{OSM_COLOR}"></span>OSM industrial location</span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+# =========================================================
+# DETECTION MAP PAGE
+# =========================================================
 
-    # Analytics
-    a1, a2 = st.columns(2)
+elif "Detection Map" in page or "Detection Records" in page:
 
-    with a1:
-
-        st.markdown(
-            """
-            <div class="section-head">
-                <div class="section-title">Classification distribution</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        counts = data[
-            "AI Classification"
-        ].value_counts()
-
-        render_donut(
-            counts,
-            CLASS_COLOR,
-            key="classification_donut"
-        )
-
-        if len(india_firms) > 0:
-            st.caption(
-                f"India overview: {len(india_firms)} current FIRMS hotspots; "
-                f"AI predictions available for {len(data)} validated India hotspots."
-            )
-
-    with a2:
-
-        st.markdown(
-            """
-            <div class="section-head">
-                <div class="section-title">Risk distribution</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        risk_counts = data[
-            "Risk Level"
-        ].value_counts()
-
-        render_donut(
-            risk_counts,
-            RISK_COLOR,
-            key="risk_donut"
-        )
-
-    # ---------------------------------------------------------
-    # Top States by industrial fire count
-    # ---------------------------------------------------------
-    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
         """
         <div class="section-head">
-            <div class="section-title">Top states by detection count</div>
-            <div class="section-tag">AI PREDICTIONS · ALL CLASSES</div>
+            <div class="section-title">Detection Map &amp; Spatial Hotspot Explorer</div>
+            <div class="section-tag">INDIA &middot; FIRMS &middot; OSM INDUSTRIAL LAYER</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    if "state" in data.columns and len(data) > 0:
-        state_counts = (
-            data.groupby("state")["AI Classification"]
-            .count()
-            .reset_index()
-            .rename(columns={"AI Classification": "Detections"})
-            .sort_values("Detections", ascending=False)
-            .head(10)
-            .set_index("state")
-        )
-
-        # Industrial fires per state
-        industrial_by_state = (
-            data[data["AI Classification"] == "Industrial Fire"]
-            .groupby("state")
-            .size()
-            .rename("Industrial Fires")
-        )
-
-        state_chart = state_counts.join(industrial_by_state, how="left").fillna(0)
-        state_chart["Industrial Fires"] = state_chart["Industrial Fires"].astype(int)
-
-        st.bar_chart(
-            state_chart,
-            use_container_width=True,
-            height=280,
-            color=["#4c8dff", "#ff5a3c"]
-        )
-        st.caption(
-            "Blue = all detections · Red = industrial fires only · "
-            "Top 10 states shown"
-        )
+    # Render interactive map on Detection Map page
+    if len(india_firms) > 0:
+        center = [
+            india_firms["latitude"].mean(),
+            india_firms["longitude"].mean()
+        ]
     else:
-        st.info("State breakdown not available — no data after current filters.")
+        center = [22.5, 79.0]
 
+    det_map = folium.Map(
+        location=center,
+        zoom_start=5,
+        tiles=None
+    )
 
-# =========================================================
-# THERMAL MAP PAGE
-# =========================================================
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri World Imagery",
+        name="Satellite",
+        overlay=False,
+        control=True
+    ).add_to(det_map)
 
-elif "Detection Records" in page:
+    folium.TileLayer(
+        tiles="OpenStreetMap",
+        name="Street Map",
+        overlay=False,
+        control=True
+    ).add_to(det_map)
 
+    if len(industrial_locations) > 0:
+        ind_points = industrial_locations[["latitude", "longitude"]].dropna().values.tolist()
+        FastMarkerCluster(
+            data=ind_points,
+            name="OSM Industrial Facilities",
+            control=True
+        ).add_to(det_map)
+
+    for h_idx, (_, row) in enumerate(india_firms.iterrows()):
+        ai_r = str(row.get("Risk Level", "")).upper()
+        conf_color = RISK_COLOR.get(ai_r, "#8b96aa")
+        f_val = row.get("frp", float("nan"))
+        f_str = f"{f_val:.2f} MW" if pd.notna(f_val) else "N/A"
+        sym = {
+            "Industrial Fire": "🔥",
+            "Gas Flare": "🕯",
+            "Forest / Wildfire": "🌲",
+            "Agricultural Burning": "🌾",
+            "Mining Activity": "⛏",
+            "Other Thermal Event": "☀"
+        }.get(str(row.get("AI Classification", "")), "◉")
+
+        t_icon = folium.DivIcon(
+            html=f"""
+            <div style="width:32px;height:32px;border:2.5px solid {conf_color};border-radius:50%;
+                 background:rgba(9,12,17,0.95);box-shadow:0 0 10px {conf_color};display:flex;
+                 align-items:center;justify-content:center;transform:translate(-50%,-50%);font-size:16px;">
+                {sym}
+            </div>
+            """
+        )
+        folium.Marker(
+            location=[row["latitude"], row["longitude"]],
+            icon=t_icon,
+            tooltip=f"<b>Hotspot #{h_idx}</b><br>Class: {row.get('AI Classification', 'N/A')}<br>FRP: {f_str}<br>Risk: {ai_r}"
+        ).add_to(det_map)
+
+    folium.LayerControl().add_to(det_map)
+
+    st_folium(
+        det_map,
+        width=None,
+        height=420,
+        key="detection_map_view",
+        returned_objects=[]
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown(
         """
         <div class="section-head">
             <div class="section-title">Detection records</div>
+            <div class="section-tag">TABULAR TELEMETRY</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -2266,7 +2436,7 @@ elif "Detection Records" in page:
         st.download_button(
             label="⬇ Download CSV",
             data=csv_bytes,
-            file_name="india_fire_detections.csv",
+            file_name="firesight_fire_detections.csv",
             mime="text/csv",
             use_container_width=True
         )
@@ -2306,7 +2476,7 @@ elif "Detection Records" in page:
         st.download_button(
             label="⬇ Download GeoJSON",
             data=geojson_bytes,
-            file_name="india_fire_detections.geojson",
+            file_name="firesight_fire_detections.geojson",
             mime="application/geo+json",
             use_container_width=True
         )
@@ -2349,7 +2519,7 @@ elif "Detection Records" in page:
                     <span>&middot;</span>
                     <span>FRP {row["frp"]:.2f} MW</span>
                     <span>&middot;</span>
-                    <span>{"Industry context unavailable" if pd.isna(row["Distance to Industry (km)"]) else f"{row["Distance to Industry (km)"]:.2f} km to industry"}</span>
+                    <span>{"Industry context unavailable" if pd.isna(row["Distance to Industry (km)"]) else f"{row['Distance to Industry (km)']:.2f} km to industry"}</span>
                     <span>&middot;</span>
                     <span>{row["Risk Score"]}/100</span>
                 </div>
@@ -2359,16 +2529,17 @@ elif "Detection Records" in page:
 
 
 # =========================================================
-# SYSTEM INFO
+# SYSTEM HEALTH
 # =========================================================
 
-elif "System Info" in page:
+elif "System Health" in page or "System Info" in page:
 
     # ---- Section header ----
     st.markdown(
         """
         <div class="section-head">
-            <div class="section-title">System information</div>
+            <div class="section-title">System Health &amp; Diagnostics</div>
+            <div class="section-tag">FIRESIGHT AI ENGINE</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -2377,8 +2548,8 @@ elif "System Info" in page:
     st.markdown(
         """
         <div class="info-panel">
-        <b>Project</b> &mdash; SIH26162: Industrial Fire &amp; Persistent
-        Thermal Source Detection<br><br>
+        <b>Project</b> &mdash; FireSight AI (AI-Powered Industrial Fire &amp;
+        Thermal Source Monitoring)<br><br>
 
         <b>Thermal data</b> &mdash; NASA FIRMS (VIIRS NOAA-20 / NOAA-21 NRT)<br>
         <b>Industrial / geospatial data</b> &mdash; OpenStreetMap (Overpass API)<br>
@@ -2469,7 +2640,6 @@ elif "System Info" in page:
 
         # Build rows for each real class (skip avg rows)
         skip_keys = {"accuracy", "macro avg", "weighted avg"}
-        rows_html = ""
         for cls in metrics["classes"]:
             if cls in skip_keys:
                 continue
@@ -2488,60 +2658,60 @@ elif "System Info" in page:
                     f'background:{color};transition:width .3s;"></div></div>'
                 )
 
-            rows_html += f"""
-            <div style="background:#0e131b;border:1px solid #202a38;
-                border-left:3px solid {color};border-radius:6px;
-                padding:12px 16px;margin-bottom:10px;">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                <span style="font-size:18px;">{icon}</span>
-                <span style="color:#e7edf6;font-weight:600;font-size:13px;">{cls}</span>
-                <span style="margin-left:auto;font-family:monospace;color:#566073;
-                    font-size:11px;">{sup} samples</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-                <div>
-                  <div style="color:#8b96aa;font-size:11px;text-transform:uppercase;
-                      letter-spacing:.6px;">Precision</div>
-                  <div style="color:#e7edf6;font-family:monospace;font-size:18px;
-                      font-weight:600;">{prec:.1f}%</div>
-                  {bar(prec, color)}
-                </div>
-                <div>
-                  <div style="color:#8b96aa;font-size:11px;text-transform:uppercase;
-                      letter-spacing:.6px;">Recall</div>
-                  <div style="color:#e7edf6;font-family:monospace;font-size:18px;
-                      font-weight:600;">{rec:.1f}%</div>
-                  {bar(rec, color)}
-                </div>
-                <div>
-                  <div style="color:#8b96aa;font-size:11px;text-transform:uppercase;
-                      letter-spacing:.6px;">F1-Score</div>
-                  <div style="color:#e7edf6;font-family:monospace;font-size:18px;
-                      font-weight:600;">{f1:.1f}%</div>
-                  {bar(f1, color)}
-                </div>
-              </div>
-            </div>
-            """
+            card_html = (
+                f'<div style="background:#0e131b;border:1px solid #202a38;'
+                f'border-left:3px solid {color};border-radius:6px;'
+                f'padding:12px 16px;margin-bottom:10px;">'
+                f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+                f'<span style="font-size:18px;">{icon}</span>'
+                f'<span style="color:#e7edf6;font-weight:600;font-size:13px;">{cls}</span>'
+                f'<span style="margin-left:auto;font-family:monospace;color:#566073;'
+                f'font-size:11px;">{sup} samples</span>'
+                f'</div>'
+                f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
+                f'<div>'
+                f'<div style="color:#8b96aa;font-size:11px;text-transform:uppercase;'
+                f'letter-spacing:.6px;">Precision</div>'
+                f'<div style="color:#e7edf6;font-family:monospace;font-size:18px;'
+                f'font-weight:600;">{prec:.1f}%</div>'
+                f'{bar(prec, color)}'
+                f'</div>'
+                f'<div>'
+                f'<div style="color:#8b96aa;font-size:11px;text-transform:uppercase;'
+                f'letter-spacing:.6px;">Recall</div>'
+                f'<div style="color:#e7edf6;font-family:monospace;font-size:18px;'
+                f'font-weight:600;">{rec:.1f}%</div>'
+                f'{bar(rec, color)}'
+                f'</div>'
+                f'<div>'
+                f'<div style="color:#8b96aa;font-size:11px;text-transform:uppercase;'
+                f'letter-spacing:.6px;">F1-Score</div>'
+                f'<div style="color:#e7edf6;font-family:monospace;font-size:18px;'
+                f'font-weight:600;">{f1:.1f}%</div>'
+                f'{bar(f1, color)}'
+                f'</div>'
+                f'</div>'
+                f'</div>'
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
         # Weighted averages
         wavg = report.get("weighted avg", {})
-        rows_html += f"""
-        <div style="background:#0c1118;border:1px solid #202a38;border-radius:6px;
-            padding:10px 16px;margin-top:4px;display:flex;gap:32px;flex-wrap:wrap;">
-          <span style="color:#566073;font-size:12px;">
-            Weighted avg &nbsp;·&nbsp;
-            Precision <b style="color:#e7edf6;font-family:monospace;">
-              {wavg.get('precision',0)*100:.1f}%</b> &nbsp;·&nbsp;
-            Recall <b style="color:#e7edf6;font-family:monospace;">
-              {wavg.get('recall',0)*100:.1f}%</b> &nbsp;·&nbsp;
-            F1 <b style="color:#e7edf6;font-family:monospace;">
-              {wavg.get('f1-score',0)*100:.1f}%</b>
-          </span>
-        </div>
-        """
-
-        st.markdown(rows_html, unsafe_allow_html=True)
+        wavg_html = (
+            f'<div style="background:#0c1118;border:1px solid #202a38;border-radius:6px;'
+            f'padding:10px 16px;margin-top:4px;display:flex;gap:32px;flex-wrap:wrap;">'
+            f'<span style="color:#566073;font-size:12px;">'
+            f'Weighted avg &nbsp;·&nbsp;'
+            f'Precision <b style="color:#e7edf6;font-family:monospace;">'
+            f'{wavg.get("precision", 0)*100:.1f}%</b> &nbsp;·&nbsp;'
+            f'Recall <b style="color:#e7edf6;font-family:monospace;">'
+            f'{wavg.get("recall", 0)*100:.1f}%</b> &nbsp;·&nbsp;'
+            f'F1 <b style="color:#e7edf6;font-family:monospace;">'
+            f'{wavg.get("f1-score", 0)*100:.1f}%</b>'
+            f'</span>'
+            f'</div>'
+        )
+        st.markdown(wavg_html, unsafe_allow_html=True)
 
         # ---- Feature importances ----
         st.markdown("<br>", unsafe_allow_html=True)
@@ -2641,6 +2811,6 @@ elif "System Info" in page:
 st.divider()
 
 st.caption(
-    "SIH26162 proof-of-concept — NASA FIRMS + historical FRP + "
-    "OpenStreetMap + random forest AI"
+    "FireSight AI (AI-Powered Industrial Fire & Thermal Source Monitoring) — NASA FIRMS + historical FRP + "
+    "OpenStreetMap + Random Forest AI"
 )
