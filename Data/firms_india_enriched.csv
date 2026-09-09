@@ -1,0 +1,11 @@
+latitude,longitude,frp,baseline_frp,frp_change_percent,historical_detections,persistence_status,industry_distance_km,near_industry,industry_latitude,industry_longitude,osm_features
+6.35666,81.14708,187.3,7.196666666666666,2502.5937934228814,72,Abnormal Increase,,Unknown,,,0
+11.12294,77.05234,15.77,1.383333333333333,1040.0000000000002,12,Abnormal Increase,,Unknown,,,0
+11.02627,77.50809,8.94,1.052,749.8098859315589,5,Abnormal Increase,,Unknown,,,0
+14.53657,79.06839,41.2,5.1883333333333335,694.0893029232252,6,Abnormal Increase,,Unknown,,,0
+10.23821,79.09862,10.75,1.384,676.7341040462428,10,Abnormal Increase,,Unknown,,,0
+9.34192,78.82452,31.48,4.109333333333334,666.0609993510707,15,Abnormal Increase,,Unknown,,,0
+9.53313,78.64571,54.78,8.68,531.1059907834101,12,Abnormal Increase,,Unknown,,,0
+8.50425,80.83977,45.38,7.404166666666666,512.8981429375352,96,Abnormal Increase,,Unknown,,,0
+10.27256,77.2524,16.81,2.835,492.9453262786596,16,Abnormal Increase,,Unknown,,,0
+10.4262,79.25689,106.24,17.97142857142857,491.1605723370429,7,Abnormal Increase,,Unknown,,,0

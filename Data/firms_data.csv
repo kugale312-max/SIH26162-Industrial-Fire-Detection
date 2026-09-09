@@ -1,0 +1,11 @@
+id,latitude,longitude,frp,baseline_frp,confidence,land_type,near_industry,detections,duration_hours,classification
+1,18.5204,73.8567,120,100,95,Industrial,Yes,6,8,Normal Persistent Source
+2,18.5310,73.8400,80,75,90,Forest,No,1,2,Other Thermal Event
+3,18.6100,73.9100,150,100,97,Industrial,Yes,8,12,Normal Persistent Source
+4,18.4500,74.0100,45,40,70,Agriculture,No,1,1,Other Thermal Event
+5,18.5800,73.9200,300,100,96,Industrial,Yes,2,3,Industrial Fire
+6,18.4700,73.8500,60,55,85,Forest,No,2,3,Other Thermal Event
+7,18.6400,73.8800,135,120,96,Industrial,Yes,9,15,Normal Persistent Source
+8,18.4900,73.9500,50,45,75,Agriculture,No,1,1,Other Thermal Event
+9,18.5500,73.8000,280,90,95,Industrial,Yes,2,4,Industrial Fire
+10,18.4300,73.9000,40,35,68,Forest,No,1,2,Other Thermal Event

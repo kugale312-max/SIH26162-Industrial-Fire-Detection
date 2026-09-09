@@ -1,0 +1,14 @@
+latitude,longitude,frp,baseline_frp,frp_change_percent,confidence_score,Distance_to_Industry_km,near_industry_numeric,detections,classification
+18.54775,74.2534,0.82,1.61,-49.068322981366464,70,6.82,0,1,Other Thermal Event
+18.50696,74.2235,0.68,0.68,0.0,70,2.91,0,0,Other Thermal Event
+18.4227,73.94713,0.45,0.45,0.0,70,2.84,0,0,Other Thermal Event
+18.43314,74.12675,0.5,0.5,0.0,70,7.73,0,0,Other Thermal Event
+18.57163,74.18153,2.1,2.1,0.0,70,5.87,0,0,Other Thermal Event
+18.80127,74.25323,1.25,1.67,-25.149700598802394,70,32.07,0,2,Normal Persistent Source
+18.80414,74.25832,1.88,1.355,38.74538745387453,70,32.48,0,2,Normal Persistent Source
+18.77779,73.7496,1.86,1.86,0.0,70,40.84,0,0,Other Thermal Event
+18.3947,74.34995,1.79,1.79,0.0,70,17.38,0,0,Other Thermal Event
+18.54595,74.25349,1.61,0.82,96.34146341463416,70,6.73,0,1,Other Thermal Event
+18.79948,74.2539,1.46,1.565,-6.7092651757188495,70,31.88,0,2,Normal Persistent Source
+18.45843,74.21844,3.53,3.53,0.0,70,2.71,0,0,Other Thermal Event
+18.5062,74.34609,5.6,5.6,0.0,70,14.25,0,0,Other Thermal Event
