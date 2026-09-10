@@ -49,7 +49,10 @@ st.markdown("""
     }
 
     .stApp {
-        background: #090c11;
+        background-color: #090c11;
+        background-image: radial-gradient(circle at 15% 50%, rgba(76, 141, 255, 0.05), transparent 40%),
+                          radial-gradient(circle at 85% 30%, rgba(167, 139, 250, 0.05), transparent 40%);
+        background-attachment: fixed;
     }
 
     [data-testid="stSidebar"] {
@@ -145,8 +148,7 @@ st.markdown("""
 
     .metric-card {
         background: #0e131b;
-        border: 1px solid #202a38;
-        border-left: 3px solid var(--accent, #4c8dff);
+        border: 1px solid var(--accent, #4c8dff);
         border-radius: 6px;
         padding: 16px 18px;
         min-height: 104px;
@@ -492,7 +494,18 @@ st.markdown("""
     div[data-testid="stExpander"] {
         background: #0e131b;
         border: 1px solid #202a38;
-        border-radius: 4px;
+        border-radius: 6px;
+        border-bottom: 2px solid transparent;
+        background-clip: padding-box;
+        position: relative;
+    }
+    div[data-testid="stExpander"]::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(to right, #4c8dff, #2fd0a6, #f2a93b, #ff3b46, #a78bfa);
+        border-radius: 0 0 6px 6px;
     }
 
     hr {
@@ -1140,10 +1153,10 @@ with st.sidebar:
     page = st.radio(
         "Navigation",
         [
-            "Overview",
-            "Hotspot Analysis",
-            "Detection Records",
-            "System Info"
+            "◎ Overview",
+            "⏱️ Hotspot Analysis",
+            "📋 Detection Records",
+            "ℹ️ System Info"
         ],
         label_visibility="collapsed"
     )
@@ -1267,31 +1280,43 @@ _danger_class = " danger" if high_risk > 0 else ""
 st.markdown(
     f"""
     <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;">
-        <div class="metric-card" style="--accent:{OSM_COLOR};flex:1;min-width:180px;">
-            <div>
-                <div class="metric-label">India active hotspots</div>
-                <div class="metric-value">{total_hotspots}</div>
+        <div class="metric-card" style="--accent:#4c8dff;flex:1;min-width:180px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="metric-label">India active hotspots</div>
+                    <div class="metric-value">{total_hotspots}</div>
+                </div>
+                <div style="font-size:20px; color:#4c8dff;">💧</div>
             </div>
             <div class="metric-footnote">NASA FIRMS &middot; latest 1 day</div>
         </div>
-        <div class="metric-card" style="--accent:{class_color('Industrial Fire')};flex:1;min-width:180px;">
-            <div>
-                <div class="metric-label">AI-flagged industrial fires</div>
-                <div class="metric-value">{industrial_fires}</div>
+        <div class="metric-card" style="--accent:#ff9f1c;flex:1;min-width:180px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="metric-label">AI-flagged industrial fires</div>
+                    <div class="metric-value">{industrial_fires}</div>
+                </div>
+                <div style="font-size:20px; color:#ff9f1c;">🔥</div>
             </div>
             <div class="metric-footnote">predicted events</div>
         </div>
-        <div class="metric-card" style="--accent:#f2a93b;flex:1;min-width:180px;">
-            <div>
-                <div class="metric-label">Gas flares &amp; mining</div>
-                <div class="metric-value">{persistent_sources}</div>
+        <div class="metric-card" style="--accent:#a78bfa;flex:1;min-width:180px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="metric-label">Gas flares &amp; mining</div>
+                    <div class="metric-value">{persistent_sources}</div>
+                </div>
+                <div style="font-size:20px; color:#a78bfa;">⛏️</div>
             </div>
             <div class="metric-footnote">persistent thermal sources</div>
         </div>
-        <div class="metric-card{_danger_class}" style="--accent:{risk_color('HIGH')};flex:1;min-width:180px;">
-            <div>
-                <div class="metric-label">High risk events</div>
-                <div class="metric-value">{high_risk}</div>
+        <div class="metric-card{_danger_class}" style="--accent:#ff3b46;flex:1;min-width:180px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="metric-label">High risk events</div>
+                    <div class="metric-value">{high_risk}</div>
+                </div>
+                <div style="font-size:20px; color:#ff3b46;">🔥</div>
             </div>
             <div>
                 <div class="metric-footnote">risk score &ge; 70</div>
@@ -1397,7 +1422,7 @@ if "Dashboard" in page or "Overview" in page:
     # Map view mode toggle
     map_mode = st.radio(
         "Map layer",
-        ["📍 Markers", "🌡️ Heatmap", "📍 + 🌡️ Both"],
+        ["📍 Markers", "🔥 Heatmap", "📍 + 🔥 Both"],
         horizontal=True,
         index=0,
         key="map_mode_radio"
@@ -1469,8 +1494,8 @@ if "Dashboard" in page or "Overview" in page:
         )
 
     # ---- Map layer mode (set by the radio toggle above) ----
-    show_heatmap = map_mode in ["🌡️ Heatmap", "📍 + 🌡️ Both"]
-    show_markers = map_mode in ["📍 Markers", "📍 + 🌡️ Both"]
+    show_heatmap = map_mode in ["🔥 Heatmap", "📍 + 🔥 Both"]
+    show_markers = map_mode in ["📍 Markers", "📍 + 🔥 Both"]
 
     # Marker layer — only rendered when mode includes markers.
     if show_markers:
