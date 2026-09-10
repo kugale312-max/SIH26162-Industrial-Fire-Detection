@@ -6,3 +6,4 @@ streamlit-folium
 numpy
 joblib
 scikit-learn
+python-dotenv

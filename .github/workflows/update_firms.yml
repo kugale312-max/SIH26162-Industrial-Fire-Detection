@@ -1,0 +1,119 @@
+name: Update FIRMS Data
+
+on:
+  schedule:
+    # 9:00 AM IST = 3:30 AM UTC
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-firms:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Create .env from secrets
+        run: |
+          echo "FIRMS_MAP_KEY=${{ secrets.FIRMS_MAP_KEY }}" > .env
+
+      - name: Run Pipeline
+        run: |
+          # 1. Fetch current FIRMS data
+          python india_firms.py
+          
+          # 1.5 Update rolling 30-day historical FIRMS data
+          python india_historical_firms.py
+          
+          # 2. Update historical/baseline
+          python india_baseline.py
+          
+          # 3. Create AI dataset
+          python india_ai_dataset.py
+          
+          # 4. Generate Predictions
+          python predict_india_hotspots.py
+          
+      - name: Generate Metadata
+        run: |
+          python -c "
+          import json, os
+          from datetime import datetime, timezone, timedelta
+          ist = timezone(timedelta(hours=5, minutes=30))
+          now_ist = datetime.now(ist)
+          try:
+              import pandas as pd
+              df = pd.read_csv('data/india_ai_predictions.csv')
+              firms_records = len(pd.read_csv('data/firms_india.csv')) if os.path.exists('data/firms_india.csv') else 0
+              india_records = len(df)
+              industrial_fire_count = int((df['ai_classification'] == 'Industrial Fire').sum()) if 'ai_classification' in df.columns else 0
+              high_risk_count = int((df['final_risk_category'] == 'HIGH').sum()) if 'final_risk_category' in df.columns else 0
+          except Exception as e:
+              firms_records = 0
+              india_records = 0
+              industrial_fire_count = 0
+              high_risk_count = 0
+              print(f'Error reading csv for metadata: {e}')
+              
+          meta = {
+              'updated_at': now_ist.isoformat(),
+              'updated_at_ist': now_ist.strftime('%d %b %Y, %H:%M IST'),
+              'firms_records': firms_records,
+              'india_records': india_records,
+              'industrial_fire_count': industrial_fire_count,
+              'high_risk_count': high_risk_count
+          }
+          with open('data/update_metadata.json', 'w') as f:
+              json.dump(meta, f, indent=4)
+          "
+
+      - name: Validate Generated Files
+        run: |
+          if [ ! -s data/firms_india.csv ]; then echo "Error: firms_india.csv is empty or missing"; exit 1; fi
+          if [ ! -s data/firms_india_baseline.csv ]; then echo "Error: firms_india_baseline.csv is empty or missing"; exit 1; fi
+          if [ ! -s data/india_ai_training.csv ]; then echo "Error: india_ai_training.csv is empty or missing"; exit 1; fi
+          if [ ! -s data/india_ai_predictions.csv ]; then echo "Error: india_ai_predictions.csv is empty or missing"; exit 1; fi
+          
+          # Check that prediction CSV contains data lines (at least 2 lines: 1 header + 1 data)
+          lines=\$(wc -l < data/india_ai_predictions.csv)
+          if [ "\$lines" -lt 2 ]; then
+            echo "Error: india_ai_predictions.csv has no data rows"
+            exit 1
+          fi
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add data/firms_india.csv
+          git add data/firms_india_baseline.csv
+          git add data/india_ai_training.csv
+          git add data/india_ai_predictions.csv
+          git add data/update_metadata.json
+          
+          git status
+          
+          # Only commit if there are changes to avoid empty commit error
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update FIRMS data and AI predictions"
+            git push origin main
+          fi
+          
+      - name: Clean up secrets
+        if: always()
+        run: rm -f .env

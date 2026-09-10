@@ -1192,9 +1192,27 @@ with st.sidebar:
 
 
 from datetime import datetime, timezone, timedelta as _td
+import os
+import json
 
 _IST = timezone(_td(hours=5, minutes=30))
-_now_ist = datetime.now(_IST).strftime("%H:%M IST")
+
+update_time_str = "Unknown"
+metadata_path = "data/update_metadata.json"
+if os.path.exists(metadata_path):
+    try:
+        with open(metadata_path, "r") as f:
+            meta = json.load(f)
+            update_time_str = meta.get("updated_at_ist", "Unknown")
+    except Exception:
+        pass
+else:
+    try:
+        if os.path.exists("data/india_ai_predictions.csv"):
+            mtime = os.path.getmtime("data/india_ai_predictions.csv")
+            update_time_str = datetime.fromtimestamp(mtime, _IST).strftime("%d %b %Y, %H:%M IST")
+    except Exception:
+        pass
 
 st.markdown(
     f"""
@@ -1204,9 +1222,16 @@ st.markdown(
             <div class="console-subtitle">NASA FIRMS &middot; historical thermal baseline &middot; OpenStreetMap &middot; AI classification</div>
         </div>
         <div class="console-header-right">
-            <div class="console-live">LIVE &middot; {_now_ist}</div>
+            <div class="console-live" style="color:#8b96aa; border-color:#202a38; background:#0e131b;">
+                <span style="display:none;"></span>LAST UPDATED &middot; {update_time_str}
+            </div>
         </div>
     </div>
+    <style>
+    .console-live::before {{
+        display: none;
+    }}
+    </style>
     """,
     unsafe_allow_html=True
 )
