@@ -1,7 +1,16 @@
 import os
+import sys
 import requests
 import pandas as pd
 from dotenv import load_dotenv
+
+# Ensure safe console output for unicode characters across platforms
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # Load NASA FIRMS API key from .env
 load_dotenv()
@@ -12,7 +21,7 @@ if not MAP_KEY:
     print("❌ FIRMS_MAP_KEY not found in .env file.")
     print("Please add:")
     print("FIRMS_MAP_KEY=YOUR_MAP_KEY")
-    exit()
+    sys.exit(1)
 
 # ============================================================
 # INDIA BOUNDING BOX
@@ -106,7 +115,7 @@ if not all_data:
     print("2. No hotspots were detected")
     print("3. NASA FIRMS server is temporarily unavailable")
 
-    exit()
+    sys.exit(1)
 
 
 combined_df = pd.concat(all_data, ignore_index=True)

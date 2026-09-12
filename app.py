@@ -4,6 +4,7 @@ import requests
 import folium
 from folium.plugins import HeatMap, MarkerCluster, FastMarkerCluster
 from streamlit_folium import st_folium
+import os
 
 
 # =========================================================
@@ -640,13 +641,13 @@ def _haversine_min(lat, lon, ind_lats, ind_lons, ind_names):
 
 
 @st.cache_data(show_spinner=False)
-def compute_nearest_industry(_hotspots_df, _industry_df):
+def compute_nearest_industry(hotspots_df, _industry_df):
     """
-    Compute nearest industrial facility from _industry_df for each row in _hotspots_df.
+    Compute nearest industrial facility from _industry_df for each row in hotspots_df.
     Cached across reruns.
     """
     if _industry_df is None or len(_industry_df) == 0:
-        n = len(_hotspots_df)
+        n = len(hotspots_df)
         return ["Not available"] * n, [float("nan")] * n, ["Unknown"] * n
 
     ind_lats  = _industry_df["latitude"].to_numpy(dtype=float)
@@ -654,7 +655,7 @@ def compute_nearest_industry(_hotspots_df, _industry_df):
     ind_names = _industry_df["name"].fillna("Unnamed Industrial Feature").tolist()
 
     names, dists, flags = [], [], []
-    for _, row in _hotspots_df.iterrows():
+    for _, row in hotspots_df.iterrows():
         try:
             name, dist = _haversine_min(
                 float(row["latitude"]),
@@ -670,16 +671,31 @@ def compute_nearest_industry(_hotspots_df, _industry_df):
     return names, dists, flags
 
 
+def get_data_version():
+    """
+    Return a version string based on latest modified time of data files
+    to bust Streamlit cache whenever data files are updated.
+    """
+    files = [
+        "data/india_ai_predictions.csv",
+        "data/firms_india.csv",
+        "data/update_metadata.json"
+    ]
+    mtimes = [os.path.getmtime(f) for f in files if os.path.exists(f)]
+    return str(max(mtimes)) if mtimes else "default"
+
+
 # =========================================================
 # CACHED DATA INGESTION & PIPELINE
 # =========================================================
 
-@st.cache_data(show_spinner=False)
-def load_all_data():
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_all_data(data_version="default"):
     """
     Loads all core datasets once, normalizes AI schemas, precomputes
     state tags and nearest industry proximity, and caches the result
     so subsequent filter changes and UI interactions execute instantly.
+    Cache automatically busts when data_version changes.
     """
     PREDICTION_FILE = "data/india_ai_predictions.csv"
     OSM_FILE = "data/industrial_locations_real.csv"
@@ -807,7 +823,7 @@ def load_all_data():
 
 
 try:
-    data_raw, industrial_locations, india_firms_raw, india_historical = load_all_data()
+    data_raw, industrial_locations, india_firms_raw, india_historical = load_all_data(get_data_version())
     data = data_raw.copy()
     india_firms = india_firms_raw.copy()
 except FileNotFoundError:
@@ -1210,22 +1226,26 @@ import json
 
 _IST = timezone(_td(hours=5, minutes=30))
 
-update_time_str = "Unknown"
+update_time_str = ""
 metadata_path = "data/update_metadata.json"
 if os.path.exists(metadata_path):
     try:
-        with open(metadata_path, "r") as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
-            update_time_str = meta.get("updated_at_ist", "Unknown")
+            update_time_str = meta.get("updated_at_ist", "")
     except Exception:
         pass
-else:
+
+if not update_time_str or update_time_str == "Unknown":
     try:
         if os.path.exists("data/india_ai_predictions.csv"):
             mtime = os.path.getmtime("data/india_ai_predictions.csv")
             update_time_str = datetime.fromtimestamp(mtime, _IST).strftime("%d %b %Y, %H:%M IST")
     except Exception:
         pass
+
+if not update_time_str:
+    update_time_str = "Unknown"
 
 st.markdown(
     f"""

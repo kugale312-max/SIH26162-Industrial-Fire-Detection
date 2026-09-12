@@ -1,6 +1,15 @@
 import os
+import sys
 import pandas as pd
 import numpy as np
+
+# Ensure safe console output for unicode characters across platforms
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # ============================================================
 # INDIA AI TRAINING DATASET

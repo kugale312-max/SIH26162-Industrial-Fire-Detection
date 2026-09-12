@@ -1,6 +1,16 @@
 import os
+import sys
 import math
+import numpy as np
 import pandas as pd
+
+# Ensure safe console output for unicode characters across platforms
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -109,6 +119,12 @@ def main():
 
     print("\nCalculating local historical baselines...")
 
+    h_lats = historical["latitude"].to_numpy()
+    h_lons = historical["longitude"].to_numpy()
+    h_frps = historical["frp"].to_numpy()
+    has_dates = "acq_date" in current.columns and "acq_date" in historical.columns
+    h_dates = historical["acq_date"].to_numpy() if has_dates else None
+
     for index, row in current.iterrows():
 
         current_lat = row["latitude"]
@@ -117,29 +133,37 @@ def main():
 
         distances = []
 
-        for h_index, h_row in historical.iterrows():
+        # Coarse bounding-box filter: 2.0 km is < 0.02 deg; ±0.03 deg is ~3.3 km
+        candidate_mask = (
+            (h_lats >= current_lat - 0.03) & (h_lats <= current_lat + 0.03) &
+            (h_lons >= current_lon - 0.03) & (h_lons <= current_lon + 0.03)
+        )
+        candidate_indices = np.where(candidate_mask)[0]
+
+        for h_index in candidate_indices:
 
             # Do not compare an observation with itself when the
             # same observation appears in the historical collection.
             if (
-                pd.notna(row.get("acq_date"))
-                and pd.notna(h_row.get("acq_date"))
-                and row["acq_date"] == h_row["acq_date"]
-                and abs(current_lat - h_row["latitude"]) < 1e-7
-                and abs(current_lon - h_row["longitude"]) < 1e-7
+                has_dates
+                and pd.notna(row.get("acq_date"))
+                and pd.notna(h_dates[h_index])
+                and row["acq_date"] == h_dates[h_index]
+                and abs(current_lat - h_lats[h_index]) < 1e-7
+                and abs(current_lon - h_lons[h_index]) < 1e-7
             ):
                 continue
 
             distance = haversine_km(
                 current_lat,
                 current_lon,
-                h_row["latitude"],
-                h_row["longitude"]
+                h_lats[h_index],
+                h_lons[h_index]
             )
 
             if distance <= SEARCH_RADIUS_KM:
                 distances.append(
-                    (h_index, distance, h_row["frp"])
+                    (h_index, distance, h_frps[h_index])
                 )
 
         # Historical observations near this hotspot.
