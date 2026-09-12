@@ -41,50 +41,47 @@ st.set_page_config(
 # =========================================================
 
 st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&family=Inter:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-
     html, body, [class*="css"] {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Inter', sans-serif;
     }
-
+    
     .stApp {
         background-color: #090c11;
-        background-image: radial-gradient(circle at 15% 50%, rgba(76, 141, 255, 0.05), transparent 40%),
-                          radial-gradient(circle at 85% 30%, rgba(167, 139, 250, 0.05), transparent 40%);
-        background-attachment: fixed;
+        color: #e7edf6;
     }
 
     [data-testid="stSidebar"] {
         background: #0b0e15;
-        border-right: 1px solid #171f2b;
+        border-right: none;
     }
 
     /* ---------- header ---------- */
-
     .console-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom: 1px solid #202a38;
         padding-bottom: 16px;
         margin-bottom: 22px;
     }
 
     .console-title {
-        font-size: 22px;
-        font-weight: 600;
+        font-family: 'Noto Serif', serif;
+        font-size: 24px;
+        font-weight: 700;
         color: #e7edf6;
-        letter-spacing: 0.1px;
+        letter-spacing: -0.5px;
     }
 
     .console-subtitle {
+        font-family: 'Public Sans', sans-serif;
         font-size: 13px;
-        color: #6a768f;
+        color: #8b96aa;
         margin-top: 4px;
     }
-
+    
     .console-header-right {
         display: flex;
         align-items: center;
@@ -95,7 +92,6 @@ st.markdown("""
         font-family: 'IBM Plex Mono', monospace;
         font-size: 12px;
         color: #2fd0a6;
-        border: 1px solid #1c3a34;
         background: #0d1a17;
         padding: 5px 12px;
         border-radius: 4px;
@@ -103,8 +99,8 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 6px;
+        font-weight: 600;
     }
-
     .console-live::before {
         content: "●";
         color: #2fd0a6;
@@ -112,33 +108,28 @@ st.markdown("""
     }
 
     .deploy-badge {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Public Sans', sans-serif;
         font-size: 12px;
         font-weight: 600;
-        color: #8b96aa;
-        border: 1px solid #202a38;
+        color: #e7edf6;
         background: #0e131b;
         padding: 5px 14px;
         border-radius: 4px;
         cursor: pointer;
         transition: all 0.2s ease;
         user-select: none;
+        border: 1px solid #202a38;
     }
-
     .deploy-badge:hover {
-        color: #e7edf6;
-        border-color: #4c8dff;
         background: #131a24;
+        border-color: #4c8dff;
     }
-
-    /* ---------- keyframe animations ---------- */
 
     @keyframes pulse-border {
         0%   { box-shadow: 0 0 0px 0px rgba(255, 59, 70, 0.0); }
         50%  { box-shadow: 0 0 8px 3px rgba(255, 59, 70, 0.35); }
         100% { box-shadow: 0 0 0px 0px rgba(255, 59, 70, 0.0); }
     }
-
     @keyframes dot-pulse {
         0%   { box-shadow: 0 0 0px 0px rgba(47, 208, 166, 0.0); }
         60%  { box-shadow: 0 0 0px 4px rgba(47, 208, 166, 0.25); }
@@ -146,97 +137,89 @@ st.markdown("""
     }
 
     /* ---------- metric readouts ---------- */
-
     .metric-card {
         background: #0e131b;
-        border: 1px solid var(--accent, #4c8dff);
-        border-radius: 6px;
+        border-radius: 8px;
         padding: 16px 18px;
         min-height: 104px;
-        transition: border-color 0.3s;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
     }
-
-    .metric-card.danger {
-        animation: pulse-border 2.4s ease-in-out infinite;
-    }
-
+    .metric-card.danger { animation: pulse-border 2.4s ease-in-out infinite; }
+    
     .metric-label {
+        font-family: 'Public Sans', sans-serif;
+        text-transform: uppercase;
         color: #8b96aa;
-        font-size: 13px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 600;
         margin-bottom: 8px;
+        letter-spacing: 0.5px;
     }
-
     .metric-value {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Noto Serif', serif;
         color: #e7edf6;
         font-size: 32px;
-        font-weight: 600;
+        font-weight: 700;
         line-height: 1;
     }
-
     .metric-footnote {
         color: #56607f;
         font-size: 11.5px;
         margin-top: 8px;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Inter', sans-serif;
     }
 
     .health-bar-container {
         width: 100%;
         height: 4px;
-        background: #17202d;
+        background: #171f2b;
         border-radius: 2px;
         margin-top: 8px;
         overflow: hidden;
     }
-
     .health-bar-fill {
         height: 100%;
         border-radius: 2px;
-        background: linear-gradient(90deg, #ff9f1c, #ff3b46);
+        background: linear-gradient(90deg, #f2a93b, #ff3b46);
     }
 
     /* ---------- section headers ---------- */
-
     .section-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom: 1px solid #171f2b;
         padding-bottom: 8px;
         margin: 6px 0 14px 0;
     }
-
     .section-title {
+        font-family: 'Noto Serif', serif;
         color: #e7edf6;
-        font-size: 15.5px;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: 700;
     }
-
     .section-tag {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Public Sans', sans-serif;
         font-size: 11px;
-        color: #56607f;
+        color: #8b96aa;
     }
 
     /* ---------- legend / status strip ---------- */
-
     .legend-strip {
         display: flex;
         flex-wrap: wrap;
         gap: 18px;
         background: #0e131b;
-        border: 1px solid #202a38;
-        border-radius: 4px;
+        border-radius: 8px;
         padding: 10px 16px;
         font-size: 12.5px;
-        color: #b6c0d1;
+        color: #8b96aa;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
     }
-
     .legend-dot {
         display: inline-block;
         width: 8px;
@@ -246,101 +229,85 @@ st.markdown("""
     }
 
     /* ---------- alert rows ---------- */
-
     .alert-row {
         display: flex;
         align-items: center;
         gap: 14px;
         background: #0e131b;
-        border: 1px solid #202a38;
-        border-left: 3px solid var(--accent, #f2a93b);
-        border-radius: 4px;
+        border-radius: 8px;
         padding: 10px 14px;
         margin-bottom: 8px;
         font-size: 13px;
-        color: #d3d9e3;
-        font-family: 'IBM Plex Mono', monospace;
+        color: #e7edf6;
+        font-family: 'Inter', sans-serif;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
+        border-left: 3px solid #ff3b46;
     }
-
     .alert-badge {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Public Sans', sans-serif;
         font-weight: 600;
         font-size: 11.5px;
         padding: 3px 8px;
-        border-radius: 3px;
+        border-radius: 4px;
         color: #090c11;
+        background: #ff3b46;
         white-space: nowrap;
     }
-
     .ok-row {
         background: #0d1a17;
-        border: 1px solid #1c3a34;
-        border-left: 3px solid #2fd0a6;
-        border-radius: 4px;
+        border-radius: 8px;
         padding: 12px 14px;
         color: #9adfcb;
         font-size: 13px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #1c3a34;
+        border-left: 3px solid #2fd0a6;
     }
 
     /* ---------- info panel ---------- */
-
     .info-panel {
         background: #0e131b;
-        border: 1px solid #202a38;
-        border-radius: 4px;
+        border-radius: 8px;
         padding: 18px 20px;
         color: #b6c0d1;
         font-size: 13.5px;
         line-height: 1.9;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
     }
-
-    .info-panel b {
-        color: #e7edf6;
-    }
-
+    .info-panel b { color: #e7edf6; }
     .info-mono {
         font-family: 'IBM Plex Mono', monospace;
         color: #8b96aa;
         font-size: 12.5px;
     }
-
     .limitation-panel {
         background: #1a1408;
-        border: 1px solid #3a2c10;
-        border-left: 3px solid #f2a93b;
-        border-radius: 4px;
+        border-radius: 8px;
         padding: 14px 16px;
         color: #e8d6ad;
         font-size: 13px;
         line-height: 1.7;
+        border: 1px solid #3a2c10;
+        border-left: 3px solid #f2a93b;
     }
 
     /* ---------- sidebar ---------- */
-
-    .sidebar-brand {
-        text-align: center;
-        margin-bottom: 4px;
-        padding-top: 6px;
-    }
-
-    .sidebar-brand-mark {
-        font-size: 28px;
-        margin-bottom: 6px;
-    }
-
+    .sidebar-brand { text-align: center; margin-bottom: 4px; padding-top: 6px; }
+    .sidebar-brand-mark { font-size: 28px; margin-bottom: 6px; }
     .sidebar-brand-title {
+        font-family: 'Noto Serif', serif;
         color: #e7edf6;
-        font-size: 14px;
-        font-weight: 600;
-        letter-spacing: 0.2px;
+        font-size: 16px;
+        font-weight: 700;
     }
-
     .sidebar-brand-sub {
-        color: #56607f;
+        font-family: 'Public Sans', sans-serif;
+        color: #8b96aa;
         font-size: 11.5px;
         margin-bottom: 18px;
     }
-
     .sidebar-status-row {
         display: flex;
         align-items: center;
@@ -348,9 +315,8 @@ st.markdown("""
         color: #8b96aa;
         font-size: 12.5px;
         padding: 5px 2px;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Inter', sans-serif;
     }
-
     .sidebar-status-dot {
         width: 7px;
         height: 7px;
@@ -359,92 +325,71 @@ st.markdown("""
         flex-shrink: 0;
         animation: dot-pulse 2.8s ease-in-out infinite;
     }
-
-    .sidebar-caption {
-        color: #454e60;
-        font-size: 11px;
-        line-height: 1.6;
-    }
-
-    div[data-testid="stMetric"] {
-        background: transparent;
-    }
+    .sidebar-caption { color: #56607f; font-size: 11px; line-height: 1.6; }
+    div[data-testid="stMetric"] { background: transparent; }
 
     /* ---------- selected hotspot detail ---------- */
-
     .selected-title {
+        font-family: 'Noto Serif', serif;
         font-size: 18px;
-        font-weight: 650;
+        font-weight: 700;
         color: #e7edf6;
         margin: 2px 0 4px 0;
     }
-
     .selected-subtitle {
+        font-family: 'Public Sans', sans-serif;
         color: #8b96aa;
         font-size: 12px;
         margin-bottom: 12px;
     }
-
     .detail-card {
         background: #0e131b;
-        border: 1px solid #202a38;
-        border-radius: 7px;
+        border-radius: 8px;
         padding: 14px 16px;
         min-height: 88px;
         box-sizing: border-box;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
     }
-
-    .detail-card.fire {
-        border-left: 3px solid #ff5a3c;
-    }
-
-    .detail-card.blue {
-        border-left: 3px solid #4c8dff;
-    }
-
-    .detail-card.amber {
-        border-left: 3px solid #f2a93b;
-    }
-
-    .detail-card.teal {
-        border-left: 3px solid #2fd0a6;
-    }
-
+    .detail-card.fire { border-left: 3px solid #ff3b46; }
+    .detail-card.blue { border-left: 3px solid #4c8dff; }
+    .detail-card.amber { border-left: 3px solid #f2a93b; }
+    .detail-card.teal { border-left: 3px solid #2fd0a6; }
+    
     .detail-label {
-        color: #7f8ba1;
+        font-family: 'Public Sans', sans-serif;
+        color: #8b96aa;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: .7px;
         margin-bottom: 7px;
     }
-
     .detail-value {
-        color: #f1f5fb;
-        font-family: 'IBM Plex Mono', monospace;
+        color: #e7edf6;
+        font-family: 'Noto Serif', serif;
         font-size: 24px;
-        font-weight: 600;
+        font-weight: 700;
         line-height: 1.1;
     }
-
     .detail-small {
-        color: #566073;
+        color: #56607f;
         font-size: 10.5px;
         margin-top: 6px;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Inter', sans-serif;
     }
-
     .ai-panel {
         background: #0c1118;
-        border: 1px solid #202a38;
-        border-radius: 7px;
+        border-radius: 8px;
         padding: 16px;
         margin-top: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        border: 1px solid #202a38;
     }
-
     .ai-panel-title {
+        font-family: 'Noto Serif', serif;
         color: #e7edf6;
         font-size: 16px;
-        font-weight: 650;
+        font-weight: 700;
         margin-bottom: 14px;
     }
 
@@ -452,69 +397,36 @@ st.markdown("""
         display: inline-block;
         padding: 5px 10px;
         border-radius: 999px;
+        font-family: 'Public Sans', sans-serif;
         font-size: 11px;
-        font-weight: 650;
+        font-weight: 600;
         letter-spacing: .4px;
         margin-bottom: 8px;
     }
-
-    .ai-status.high {
-        color: #ffb3a7;
-        background: #2a1512;
-        border: 1px solid #5a2821;
-    }
-
-    .ai-status.medium {
-        color: #f5d08e;
-        background: #241b0d;
-        border: 1px solid #55401c;
-    }
-
-    .ai-status.low {
-        color: #9de4d0;
-        background: #0d211c;
-        border: 1px solid #1d4b40;
-    }
+    .ai-status.high { color: #ffb3a7; background: #2a1512; border: 1px solid #5a2821; }
+    .ai-status.medium { color: #f5d08e; background: #241b0d; border: 1px solid #55401c; }
+    .ai-status.low { color: #9de4d0; background: #0d211c; border: 1px solid #1d4b40; }
 
     .ai-class {
-        color: #f1f5fb;
+        font-family: 'Noto Serif', serif;
+        color: #e7edf6;
         font-size: 22px;
-        font-weight: 650;
+        font-weight: 700;
         line-height: 1.15;
         margin-bottom: 5px;
     }
+    .ai-note { color: #8b96aa; font-size: 11px; line-height: 1.5; }
 
-    .ai-note {
-        color: #7f8ba1;
-        font-size: 11px;
-        line-height: 1.5;
-    }
-
-
-    /* tame default streamlit chrome so it matches the console */
     div[data-testid="stExpander"] {
         background: #0e131b;
         border: 1px solid #202a38;
-        border-radius: 6px;
-        border-bottom: 2px solid transparent;
-        background-clip: padding-box;
-        position: relative;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
-    div[data-testid="stExpander"]::after {
-        content: '';
-        position: absolute;
-        bottom: 0; left: 0; right: 0;
-        height: 2px;
-        background: linear-gradient(to right, #4c8dff, #2fd0a6, #f2a93b, #ff3b46, #a78bfa);
-        border-radius: 0 0 6px 6px;
-    }
+    hr { border-color: #171f2b; }
 
-    hr {
-        border-color: #171f2b;
-    }
-
-    /* sidebar nav title */
     .sidebar-nav-header {
+        font-family: 'Public Sans', sans-serif;
         font-size: 11.5px;
         font-weight: 700;
         text-transform: uppercase;
@@ -522,38 +434,31 @@ st.markdown("""
         color: #8b96aa;
         margin: 14px 0 8px 2px;
     }
-
-    /* filter status text */
     .filter-status-text {
         color: #8b96aa;
         font-size: 12.5px;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Inter', sans-serif;
         margin: 8px 0 14px 2px;
     }
 
-    /* sidebar radio pills */
-    [data-testid="stSidebar"] [data-testid="stRadio"] > div {
-        gap: 6px;
-    }
     [data-testid="stSidebar"] [data-testid="stRadio"] label {
         background: #0e131b;
         border: 1px solid #202a38;
-        border-radius: 6px;
+        border-radius: 8px;
         padding: 8px 12px;
         margin: 0;
         cursor: pointer;
         transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.5);
     }
     [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
-        border-color: #3b4d66;
         background: #131a24;
+        border-color: #3b4d66;
     }
     [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
         background: #152233;
         border-color: #4c8dff;
-        box-shadow: 0 0 10px rgba(76, 141, 255, 0.15);
+        box-shadow: none;
     }
     [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) span {
         color: #e7edf6 !important;
