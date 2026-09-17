@@ -1,0 +1,255 @@
+{
+    "evaluated_at": "2026-09-17 12:07:21 IST",
+    "accuracy": 98.16,
+    "macro_f1": 97.36,
+    "weighted_f1": 98.16,
+    "macro_precision": 97.57,
+    "macro_recall": 97.36,
+    "n_train": 2390,
+    "n_test": 598,
+    "classes": [
+        "Agricultural Burning",
+        "Forest / Wildfire",
+        "Gas Flare",
+        "Industrial Fire",
+        "Mining Activity",
+        "Normal Persistent Source",
+        "Other Thermal Event"
+    ],
+    "features": [
+        "frp",
+        "baseline_frp",
+        "frp_change_percent",
+        "historical_detections",
+        "frp_anomaly_score",
+        "frp_ratio",
+        "confidence_score",
+        "is_night",
+        "brightness_diff",
+        "dist_to_industry_km",
+        "dist_to_mining_km",
+        "dist_to_gas_infrastructure_km",
+        "near_industry",
+        "near_mining",
+        "near_gas_infra",
+        "land_cover_code",
+        "high_frp",
+        "strong_anomaly",
+        "persistent_heat",
+        "new_event"
+    ],
+    "params": {
+        "n_estimators": "250",
+        "max_depth": "12",
+        "min_samples_split": "4",
+        "min_samples_leaf": "2",
+        "class_weight": "balanced_subsample",
+        "random_state": "42",
+        "n_jobs": "-1"
+    },
+    "report": {
+        "Agricultural Burning": {
+            "precision": 0.985,
+            "recall": 0.9949494949494949,
+            "f1-score": 0.9899497487437185,
+            "support": 198.0
+        },
+        "Forest / Wildfire": {
+            "precision": 0.8888888888888888,
+            "recall": 1.0,
+            "f1-score": 0.9411764705882353,
+            "support": 16.0
+        },
+        "Gas Flare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 28.0
+        },
+        "Industrial Fire": {
+            "precision": 1.0,
+            "recall": 0.8888888888888888,
+            "f1-score": 0.9411764705882353,
+            "support": 9.0
+        },
+        "Mining Activity": {
+            "precision": 1.0,
+            "recall": 0.9782608695652174,
+            "f1-score": 0.989010989010989,
+            "support": 46.0
+        },
+        "Normal Persistent Source": {
+            "precision": 0.9672131147540983,
+            "recall": 0.9915966386554622,
+            "f1-score": 0.979253112033195,
+            "support": 119.0
+        },
+        "Other Thermal Event": {
+            "precision": 0.9887005649717514,
+            "recall": 0.9615384615384616,
+            "f1-score": 0.9749303621169917,
+            "support": 182.0
+        },
+        "accuracy": 0.9816053511705686,
+        "macro avg": {
+            "precision": 0.975686081230677,
+            "recall": 0.9736049076567893,
+            "f1-score": 0.973642450440195,
+            "support": 598.0
+        },
+        "weighted avg": {
+            "precision": 0.9820971332823055,
+            "recall": 0.9816053511705686,
+            "f1-score": 0.9816093875379771,
+            "support": 598.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            197,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+        ],
+        [
+            0,
+            16,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            28,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            8,
+            0,
+            1,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            45,
+            1,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            118,
+            1
+        ],
+        [
+            3,
+            2,
+            0,
+            0,
+            0,
+            2,
+            175
+        ]
+    ],
+    "importances": [
+        {
+            "Feature": "frp",
+            "Importance": 0.12509657011155922
+        },
+        {
+            "Feature": "dist_to_industry_km",
+            "Importance": 0.1241807676168434
+        },
+        {
+            "Feature": "historical_detections",
+            "Importance": 0.12337653998631813
+        },
+        {
+            "Feature": "dist_to_mining_km",
+            "Importance": 0.1015209938212339
+        },
+        {
+            "Feature": "dist_to_gas_infrastructure_km",
+            "Importance": 0.09410101578664497
+        },
+        {
+            "Feature": "near_gas_infra",
+            "Importance": 0.06657631611236084
+        },
+        {
+            "Feature": "baseline_frp",
+            "Importance": 0.059045376360795446
+        },
+        {
+            "Feature": "frp_ratio",
+            "Importance": 0.05398326938052367
+        },
+        {
+            "Feature": "near_industry",
+            "Importance": 0.043710621257555975
+        },
+        {
+            "Feature": "frp_change_percent",
+            "Importance": 0.04049517793837857
+        },
+        {
+            "Feature": "frp_anomaly_score",
+            "Importance": 0.03902661386258622
+        },
+        {
+            "Feature": "near_mining",
+            "Importance": 0.031768177986426234
+        },
+        {
+            "Feature": "land_cover_code",
+            "Importance": 0.02706325033910551
+        },
+        {
+            "Feature": "is_night",
+            "Importance": 0.017798653709978286
+        },
+        {
+            "Feature": "brightness_diff",
+            "Importance": 0.015857055727759115
+        },
+        {
+            "Feature": "strong_anomaly",
+            "Importance": 0.015326630338681913
+        },
+        {
+            "Feature": "persistent_heat",
+            "Importance": 0.012506134725823568
+        },
+        {
+            "Feature": "high_frp",
+            "Importance": 0.006874458640334766
+        },
+        {
+            "Feature": "new_event",
+            "Importance": 0.0009488462138455409
+        },
+        {
+            "Feature": "confidence_score",
+            "Importance": 0.0007435300832448453
+        }
+    ],
+    "uncertain_samples_pct": 2.51
+}

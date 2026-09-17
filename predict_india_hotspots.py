@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import numpy as np
 import joblib
 
 # Ensure safe console output for unicode characters across platforms
@@ -12,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # ============================================================
-# INDIA FIRMS AI PREDICTION
+# INDIA FIRMS AI MULTI-CLASS HOTSPOT PREDICTION
 # ============================================================
 
 INPUT_FILE = "data/india_ai_training.csv"
@@ -23,200 +24,180 @@ ENCODER_FILE = "model/india_label_encoder.pkl"
 IMPUTER_FILE = "model/india_imputer.pkl"
 
 print("=" * 70)
-print("INDIA FIRMS AI HOTSPOT PREDICTION")
+print("INDIA FIRMS AI HOTSPOT PREDICTION (7 CLASSES + UNCERTAINTY)")
 print("=" * 70)
 
-# ------------------------------------------------------------
-# Load files
-# ------------------------------------------------------------
+for f in [INPUT_FILE, MODEL_FILE, ENCODER_FILE, IMPUTER_FILE]:
+    if not os.path.exists(f):
+        print(f"❌ Required file missing: {f}")
+        sys.exit(1)
 
-df = pd.read_csv(INPUT_FILE)
+df_all = pd.read_csv(INPUT_FILE)
+
+# Filter to current live hotspots for predictions (or all if not tagged)
+if "is_current" in df_all.columns:
+    df = df_all[df_all["is_current"] == 1].copy().reset_index(drop=True)
+else:
+    df = df_all.copy()
+
+print(f"Loaded live hotspots to assess : {len(df)}")
 
 model = joblib.load(MODEL_FILE)
 label_encoder = joblib.load(ENCODER_FILE)
 imputer = joblib.load(IMPUTER_FILE)
 
-print(f"Input hotspots : {len(df)}")
-
 # ------------------------------------------------------------
-# Features
+# 1. Prepare Features
 # ------------------------------------------------------------
-
 features = [
     "frp",
     "baseline_frp",
     "frp_change_percent",
     "historical_detections",
     "frp_anomaly_score",
+    "frp_ratio",
+    "confidence_score",
+    "is_night",
+    "brightness_diff",
+    "dist_to_industry_km",
+    "dist_to_mining_km",
+    "dist_to_gas_infrastructure_km",
+    "near_industry",
+    "near_mining",
+    "near_gas_infra",
+    "land_cover_code",
     "high_frp",
     "strong_anomaly",
     "persistent_heat",
     "new_event"
 ]
 
+for col in features:
+    if col not in df.columns:
+        df[col] = 0.0
+
 X = df[features].copy()
-
-# ------------------------------------------------------------
-# Impute missing values
-# ------------------------------------------------------------
-
 X_imputed = imputer.transform(X)
 
 # ------------------------------------------------------------
-# AI prediction
+# 2. Generate Probabilistic Predictions
 # ------------------------------------------------------------
+pred_encoded = model.predict(X_imputed)
+pred_probs = model.predict_proba(X_imputed)
 
-prediction_encoded = model.predict(X_imputed)
+df["ai_classification"] = label_encoder.inverse_transform(pred_encoded)
+df["ai_confidence"] = (pred_probs.max(axis=1) * 100.0).round(2)
 
-prediction_probability = model.predict_proba(
-    X_imputed
-)
+# Save per-class probabilities
+classes = label_encoder.classes_
+for i, cls in enumerate(classes):
+    safe_col = "prob_" + cls.lower().replace(" ", "_").replace("/", "_")
+    df[safe_col] = (pred_probs[:, i] * 100.0).round(2)
 
-df["ai_classification"] = label_encoder.inverse_transform(
-    prediction_encoded
-)
+# Compute second most probable class & prediction margin
+sorted_indices = np.argsort(pred_probs, axis=1)
+top_class_idx = sorted_indices[:, -1]
+second_class_idx = sorted_indices[:, -2]
 
-# Highest probability
-df["ai_confidence"] = (
-    prediction_probability.max(axis=1) * 100
-).round(2)
-
-# ------------------------------------------------------------
-# AI probabilities for each class
-# ------------------------------------------------------------
-
-class_names = label_encoder.classes_
-
-for i, class_name in enumerate(class_names):
-
-    safe_name = (
-        class_name
-        .lower()
-        .replace(" ", "_")
-    )
-
-    df[f"prob_{safe_name}"] = (
-        prediction_probability[:, i] * 100
-    ).round(2)
+df["secondary_class"] = [classes[idx] for idx in second_class_idx]
+top_probs = np.take_along_axis(pred_probs, top_class_idx[:, None], axis=1).squeeze()
+second_probs = np.take_along_axis(pred_probs, second_class_idx[:, None], axis=1).squeeze()
+df["prediction_margin"] = ((top_probs - second_probs) * 100.0).round(2)
 
 # ------------------------------------------------------------
-# Final risk score
+# 3. Uncertainty Flagging
 # ------------------------------------------------------------
+# Flag hotspot as uncertain if top confidence is < 60% OR the margin
+# between top-1 and top-2 candidate classes is < 15%.
+df["is_uncertain"] = (df["ai_confidence"] < 60.0) | (df["prediction_margin"] < 15.0)
 
-def calculate_final_risk(row):
+def describe_uncertainty(row):
+    if not row["is_uncertain"]:
+        return "Confident Assessment"
+    if row["ai_confidence"] < 60.0 and row["prediction_margin"] < 15.0:
+        return f"Ambiguous ({row['ai_classification']} vs {row['secondary_class']})"
+    elif row["prediction_margin"] < 15.0:
+        return f"Borderline between {row['ai_classification']} & {row['secondary_class']}"
+    else:
+        return f"Low Confidence ({row['ai_confidence']:.1f}%)"
 
-    score = float(row["risk_score"])
+df["uncertainty_flag"] = df.apply(describe_uncertainty, axis=1)
 
-    # AI classification adjustment for all 6 classes
+# Ensure legacy columns for dashboard compatibility
+if "nearest_industrial_facility" in df.columns and "Nearest Industrial Facility" not in df.columns:
+    df["Nearest Industrial Facility"] = df["nearest_industrial_facility"]
+if "dist_to_industry_km" in df.columns and "Distance to Industry (km)" not in df.columns:
+    df["Distance to Industry (km)"] = df["dist_to_industry_km"]
+
+# ------------------------------------------------------------
+# 4. Final Risk Scoring & Classification Adjustment
+# ------------------------------------------------------------
+def compute_final_risk(row):
+    base_score = float(row.get("risk_score", 30.0))
     ai_class = row["ai_classification"]
 
+    # Consequence adjustment based on 7 classes
     if ai_class == "Industrial Fire":
-        score += 10     # highest threat
-    elif ai_class == "Gas Flare":
-        score += 5      # persistent hazard
+        base_score += 12.0   # Highest threat to life and industrial assets
     elif ai_class == "Forest / Wildfire":
-        score += 8      # rapid-spread risk
+        base_score += 8.0    # Rapid spread environmental threat
+    elif ai_class == "Gas Flare":
+        base_score += 5.0    # Hazardous flame, usually controlled
     elif ai_class == "Agricultural Burning":
-        score -= 5      # controlled / seasonal — lower threat
+        base_score -= 5.0    # Controlled / seasonal cropland burn
     elif ai_class == "Mining Activity":
-        score -= 10     # stable known source — lowest threat
-    # "Other Thermal Event" → no adjustment
+        base_score -= 8.0    # Controlled industrial pit/smolder operations
+    elif ai_class == "Normal Persistent Source":
+        base_score -= 12.0   # Routine operational kiln/furnace emitter
+    # Other Thermal Event: 0 adjustment
 
-    return max(0, min(100, score))
+    # If prediction is highly uncertain, slightly moderate extreme scores
+    if row["is_uncertain"]:
+        if base_score > 70.0:
+            base_score -= 5.0
 
+    return max(0.0, min(100.0, base_score))
 
+df["final_risk_score"] = df.apply(compute_final_risk, axis=1).round(1)
 
-df["final_risk_score"] = df.apply(
-    calculate_final_risk,
-    axis=1
-)
-
-# ------------------------------------------------------------
-# Final risk category
-# ------------------------------------------------------------
-
-def risk_category(score):
-
-    if score >= 70:
+def categorize_final_risk(score):
+    if score >= 70.0:
         return "HIGH"
-
-    elif score >= 40:
+    elif score >= 40.0:
         return "MEDIUM"
-
     return "LOW"
 
+df["final_risk_category"] = df["final_risk_score"].apply(categorize_final_risk)
 
-df["final_risk_category"] = (
-    df["final_risk_score"]
-    .apply(risk_category)
-)
-
-# ------------------------------------------------------------
-# Sort by risk
-# ------------------------------------------------------------
-
-df = df.sort_values(
-    by="final_risk_score",
-    ascending=False
-).reset_index(drop=True)
+# Sort by risk score descending
+df = df.sort_values(by="final_risk_score", ascending=False).reset_index(drop=True)
 
 # ------------------------------------------------------------
-# Save
+# 5. Save Output
 # ------------------------------------------------------------
+df.to_csv(OUTPUT_FILE, index=False)
 
-df.to_csv(
-    OUTPUT_FILE,
-    index=False
-)
-
-# ------------------------------------------------------------
-# Results
-# ------------------------------------------------------------
-
-print()
+print("\n" + "=" * 70)
+print("AI PREDICTION GENERATION COMPLETE")
 print("=" * 70)
-print("AI PREDICTION COMPLETE")
-print("=" * 70)
-
 print(f"Predictions generated : {len(df)}")
 print(f"Saved to              : {OUTPUT_FILE}")
 
-print()
-print("AI classification:")
+print("\nAI 7-Class Distribution:")
+print(df["ai_classification"].value_counts().to_string())
 
-print(
-    df["ai_classification"]
-    .value_counts()
-)
+print("\nFinal Risk Level Distribution:")
+print(df["final_risk_category"].value_counts().to_string())
 
-print()
-print("Final risk category:")
+uncertain_count = int(df["is_uncertain"].sum())
+print(f"\nUncertain Predictions : {uncertain_count} / {len(df)} ({uncertain_count/len(df)*100:.1f}%)")
 
-print(
-    df["final_risk_category"]
-    .value_counts()
-)
+print("\nTop 10 High-Risk Predictions:")
+cols_to_show = [
+    "latitude", "longitude", "frp", "frp_change_percent",
+    "ai_classification", "ai_confidence", "is_uncertain",
+    "final_risk_score", "final_risk_category"
+]
+print(df[[c for c in cols_to_show if c in df.columns]].head(10).to_string(index=False))
 
-print()
-print("Top 15 AI predictions:")
-
-print(
-    df[
-        [
-            "latitude",
-            "longitude",
-            "frp",
-            "frp_change_percent",
-            "historical_detections",
-            "ai_classification",
-            "ai_confidence",
-            "final_risk_score",
-            "final_risk_category"
-        ]
-    ]
-    .head(15)
-    .to_string(index=False)
-)
-
-print()
-print("✅ India AI prediction dataset ready.")
+print("\n✅ India AI prediction dataset ready.")

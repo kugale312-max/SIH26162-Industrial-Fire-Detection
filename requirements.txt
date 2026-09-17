@@ -7,3 +7,5 @@ numpy
 joblib
 scikit-learn
 python-dotenv
+geopandas
+shapely
