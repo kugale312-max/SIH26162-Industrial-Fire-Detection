@@ -57,35 +57,37 @@ jobs:
 
       - name: Validate Generated Files
         run: |
-          python -c "
-          import os, sys, pandas as pd
+          python -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" << 'EOF'
+            import os
+            import sys
+            import pandas as pd
 
-          required_files = [
-              'data/firms_india.csv',
-              'data/firms_india_baseline.csv',
-              'data/india_ai_training.csv',
-              'data/india_ai_predictions.csv'
-          ]
+            required_files = [
+                'data/firms_india.csv',
+                'data/firms_india_baseline.csv',
+                'data/india_ai_training.csv',
+                'data/india_ai_predictions.csv'
+            ]
 
-          for path in required_files:
-              if not os.path.exists(path):
-                  print(f'::error::Required file missing: {path}')
-                  sys.exit(1)
-              if os.path.getsize(path) == 0:
-                  print(f'::error::Required file is empty: {path}')
-                  sys.exit(1)
-              try:
-                  df = pd.read_csv(path)
-                  if len(df) == 0:
-                      print(f'::error::File has no data rows: {path}')
-                      sys.exit(1)
-                  print(f'[OK] Validated {path}: {len(df)} rows')
-              except Exception as err:
-                  print(f'::error::Failed to parse {path}: {err}')
-                  sys.exit(1)
+            for path in required_files:
+                if not os.path.exists(path):
+                    print(f'::error::Required file missing: {path}')
+                    sys.exit(1)
+                if os.path.getsize(path) == 0:
+                    print(f'::error::Required file is empty: {path}')
+                    sys.exit(1)
+                try:
+                    df = pd.read_csv(path)
+                    if len(df) == 0:
+                        print(f'::error::File has no data rows: {path}')
+                        sys.exit(1)
+                    print(f'[OK] Validated {path}: {len(df)} rows')
+                except Exception as err:
+                    print(f'::error::Failed to parse {path}: {err}')
+                    sys.exit(1)
 
-          print('All output files successfully validated.')
-          "
+            print('All output files successfully validated.')
+          EOF
 
       - name: Check for Data Changes and Update Metadata
         id: check_changes
@@ -98,11 +100,14 @@ jobs:
             echo "data_changed=true" >> $GITHUB_OUTPUT
             echo "FIRMS data or predictions updated. Generating update metadata."
 
-            python -c "
-            import json, os
+            python -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" << 'EOF'
+            import json
+            import os
             from datetime import datetime, timezone, timedelta
+
             ist = timezone(timedelta(hours=5, minutes=30))
             now_ist = datetime.now(ist)
+
             try:
                 import pandas as pd
                 df = pd.read_csv('data/india_ai_predictions.csv')
@@ -125,10 +130,12 @@ jobs:
                 'industrial_fire_count': industrial_fire_count,
                 'high_risk_count': high_risk_count
             }
+
             with open('data/update_metadata.json', 'w', encoding='utf-8') as f:
                 json.dump(meta, f, indent=4)
+
             print('Generated metadata:', meta)
-            "
+          EOF
           fi
 
       - name: Commit and Push Changes
