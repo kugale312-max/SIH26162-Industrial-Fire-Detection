@@ -151,10 +151,10 @@ print(f"✅ {val_msg}")
 # The FIRMS /api/area/csv/ endpoint requires [west,south,east,north]
 # coordinates. Passing country codes like 'IND' causes:
 # "Invalid area. Expects: [west,south,east,north]".
-WEST = 68
-SOUTH = 6
-EAST = 97
-NORTH = 37
+WEST = 68.0
+SOUTH = 6.0
+EAST = 97.5
+NORTH = 37.5
 
 AREA = f"{WEST},{SOUTH},{EAST},{NORTH}"
 
@@ -289,7 +289,7 @@ if os.path.exists(BOUNDARY_FILE):
         print("Applying GeoPandas point-in-polygon boundary filtering...")
         print("=" * 60)
         gdf_boundary = gpd.read_file(BOUNDARY_FILE)
-        boundary_geom = gdf_boundary.union_all()
+        boundary_geom = gdf_boundary.union_all() if hasattr(gdf_boundary, "union_all") else gdf_boundary.unary_union
 
         gdf_points = gpd.GeoDataFrame(
             combined_df,

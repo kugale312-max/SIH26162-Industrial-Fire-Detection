@@ -517,7 +517,7 @@ def assign_state(lat, lon):
     for state, (lat_min, lat_max, lon_min, lon_max) in INDIA_STATES.items():
         if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
             return state
-    return "Other / Outside India"
+    return "Other Indian Region"
 
 
 def _haversine_min(lat, lon, ind_lats, ind_lons, ind_names):
@@ -646,20 +646,30 @@ def load_all_data(data_version="default"):
         try:
             import geopandas as gpd
             gdf_b = gpd.read_file(BOUNDARY_FILE)
-            b_geom = gdf_b.union_all()
-            for _df, _var_name in [(df_data, "df_data"), (firms_df, "firms_df"), (hist_df, "hist_df")]:
-                if _df is not None and not _df.empty and "latitude" in _df.columns and "longitude" in _df.columns:
-                    _gdf = gpd.GeoDataFrame(_df, geometry=gpd.points_from_xy(_df["longitude"], _df["latitude"]), crs="EPSG:4326")
-                    _mask = _gdf.intersects(b_geom)
-                    _filtered = _df[_mask].copy()
-                    if "geometry" in _filtered.columns:
-                        _filtered = _filtered.drop(columns=["geometry"])
-                    if _var_name == "df_data":
-                        df_data = _filtered.reset_index(drop=True)
-                    elif _var_name == "firms_df":
-                        firms_df = _filtered.reset_index(drop=True)
-                    elif _var_name == "hist_df":
-                        hist_df = _filtered.reset_index(drop=True)
+            b_geom = gdf_b.union_all() if hasattr(gdf_b, "union_all") else gdf_b.unary_union
+            for _df, _var_name in [
+                (df_data, "df_data"),
+                (firms_df, "firms_df"),
+                (hist_df, "hist_df"),
+                (ind_locs, "ind_locs")
+            ]:
+                if _df is not None and not _df.empty:
+                    lat_k = "latitude" if "latitude" in _df.columns else ("Latitude" if "Latitude" in _df.columns else None)
+                    lon_k = "longitude" if "longitude" in _df.columns else ("Longitude" if "Longitude" in _df.columns else None)
+                    if lat_k and lon_k:
+                        _gdf = gpd.GeoDataFrame(_df, geometry=gpd.points_from_xy(_df[lon_k], _df[lat_k]), crs="EPSG:4326")
+                        _mask = _gdf.intersects(b_geom)
+                        _filtered = _df[_mask].copy()
+                        if "geometry" in _filtered.columns:
+                            _filtered = _filtered.drop(columns=["geometry"])
+                        if _var_name == "df_data":
+                            df_data = _filtered.reset_index(drop=True)
+                        elif _var_name == "firms_df":
+                            firms_df = _filtered.reset_index(drop=True)
+                        elif _var_name == "hist_df":
+                            hist_df = _filtered.reset_index(drop=True)
+                        elif _var_name == "ind_locs":
+                            ind_locs = _filtered.reset_index(drop=True)
         except Exception:
             pass
 
@@ -1406,21 +1416,34 @@ if "Dashboard" in page or "Overview" in page:
     )
 
     # India-wide FIRMS map
-    # Use all latest India hotspots for the overview, while retaining
-    # the Pune AI/OSM dataset for detailed analysis elsewhere.
-    if len(india_firms) > 0:
-        center = [
-            india_firms["latitude"].mean(),
-            india_firms["longitude"].mean()
-        ]
+    # Complete Indian territory bounding box (including Northeast and Islands)
+    # Lat: 6.75 (Nicobar) to 37.10 (Ladakh), Lon: 68.16 (Gujarat) to 97.40 (Arunachal Pradesh)
+    INDIA_TERRITORY_BOUNDS = [[6.75, 68.16], [37.10, 97.40]]
+
+    if selected_state != "All India" and selected_state in INDIA_STATES:
+        st_lat_min, st_lat_max, st_lon_min, st_lon_max = INDIA_STATES[selected_state]
+        map_bounds = [[st_lat_min, st_lon_min], [st_lat_max, st_lon_max]]
+        center = [(st_lat_min + st_lat_max) / 2, (st_lon_min + st_lon_max) / 2]
     else:
-        center = [22.5, 79.0]
+        if len(india_firms) > 0:
+            h_lat_min = float(india_firms["latitude"].min())
+            h_lat_max = float(india_firms["latitude"].max())
+            h_lon_min = float(india_firms["longitude"].min())
+            h_lon_max = float(india_firms["longitude"].max())
+            map_bounds = [
+                [min(INDIA_TERRITORY_BOUNDS[0][0], h_lat_min), min(INDIA_TERRITORY_BOUNDS[0][1], h_lon_min)],
+                [max(INDIA_TERRITORY_BOUNDS[1][0], h_lat_max), max(INDIA_TERRITORY_BOUNDS[1][1], h_lon_max)]
+            ]
+        else:
+            map_bounds = INDIA_TERRITORY_BOUNDS
+        center = [22.5, 82.5]
 
     m = folium.Map(
         location=center,
         zoom_start=5,
         tiles=None
     )
+    m.fit_bounds(map_bounds)
 
     # Satellite layer
     folium.TileLayer(
@@ -1720,7 +1743,7 @@ if "Dashboard" in page or "Overview" in page:
     map_result = st_folium(
         m,
         width=None,
-        height=430,
+        height=540,
         key="india_overview_map",
         returned_objects=[]
     )
@@ -2326,19 +2349,26 @@ elif "Detection Map" in page or "Detection Records" in page:
     )
 
     # Render interactive map on Detection Map page
+    INDIA_TERRITORY_BOUNDS = [[6.75, 68.16], [37.10, 97.40]]
     if len(india_firms) > 0:
-        center = [
-            india_firms["latitude"].mean(),
-            india_firms["longitude"].mean()
+        h_lat_min = float(india_firms["latitude"].min())
+        h_lat_max = float(india_firms["latitude"].max())
+        h_lon_min = float(india_firms["longitude"].min())
+        h_lon_max = float(india_firms["longitude"].max())
+        map_bounds = [
+            [min(INDIA_TERRITORY_BOUNDS[0][0], h_lat_min), min(INDIA_TERRITORY_BOUNDS[0][1], h_lon_min)],
+            [max(INDIA_TERRITORY_BOUNDS[1][0], h_lat_max), max(INDIA_TERRITORY_BOUNDS[1][1], h_lon_max)]
         ]
     else:
-        center = [22.5, 79.0]
+        map_bounds = INDIA_TERRITORY_BOUNDS
+    center = [22.5, 82.5]
 
     det_map = folium.Map(
         location=center,
         zoom_start=5,
         tiles=None
     )
+    det_map.fit_bounds(map_bounds)
 
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -2398,7 +2428,7 @@ elif "Detection Map" in page or "Detection Records" in page:
     st_folium(
         det_map,
         width=None,
-        height=420,
+        height=560,
         key="detection_map_view",
         returned_objects=[]
     )

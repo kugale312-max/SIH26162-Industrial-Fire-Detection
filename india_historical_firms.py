@@ -209,6 +209,32 @@ def main():
         )
 
 
+    # Point-in-polygon India boundary filtering
+    BOUNDARY_FILE = "data/india_boundary.geojson"
+    if os.path.exists(BOUNDARY_FILE):
+        try:
+            import geopandas as gpd
+            print("\n" + "=" * 70)
+            print("Applying GeoPandas point-in-polygon boundary filtering...")
+            print("=" * 70)
+            gdf_boundary = gpd.read_file(BOUNDARY_FILE)
+            boundary_geom = gdf_boundary.union_all() if hasattr(gdf_boundary, "union_all") else gdf_boundary.unary_union
+            gdf_points = gpd.GeoDataFrame(
+                historical,
+                geometry=gpd.points_from_xy(historical["longitude"], historical["latitude"]),
+                crs="EPSG:4326"
+            )
+            mask = gdf_points.intersects(boundary_geom)
+            removed_count = int((~mask).sum())
+            historical = historical[mask].copy()
+            if "geometry" in historical.columns:
+                historical = historical.drop(columns=["geometry"])
+            print(f"✅ Filtered using {BOUNDARY_FILE}")
+            print(f"  Points inside India   : {len(historical)}")
+            print(f"  Points outside India  : {removed_count} (removed)")
+        except Exception as e:
+            print(f"⚠️ Boundary filtering warning: {e}")
+
     historical.to_csv(
         OUTPUT_FILE,
         index=False
