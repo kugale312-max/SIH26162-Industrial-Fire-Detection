@@ -167,7 +167,7 @@ SOURCES = [
     "VIIRS_SNPP_NRT"
 ]
 
-DAY_RANGE = int(os.getenv("FIRMS_DAY_RANGE", "1"))
+DAY_RANGE = int(os.getenv("FIRMS_DAY_RANGE", "3"))
 
 
 # ============================================================
@@ -243,20 +243,18 @@ for source in SOURCES:
     if not df.empty:
         all_data.append(df)
 
-# If day range 1 returned no hotspots (e.g. today's satellite orbits still processing in NRT),
-# automatically attempt day range 2 to capture the latest available satellite pass
-if not all_data and DAY_RANGE == 1:
+# If day range returned no hotspots, attempt day range 3 or fallback to preserved data
+if not all_data and DAY_RANGE < 3:
     print("\n" + "-" * 60)
-    print("⚠️ No hotspots detected for Day Range 1 (current passes may still be processing in NRT).")
-    print("Attempting Day Range 2 for latest available satellite observations...")
+    print("⚠️ No hotspots detected for requested Day Range. Attempting Day Range 3...")
     print("-" * 60)
     for source in SOURCES:
-        df = fetch_source_data(source, MAP_KEY, AREA, 2)
+        df = fetch_source_data(source, MAP_KEY, AREA, 3)
         if not df.empty:
             all_data.append(df)
 
 # ============================================================
-# 7. SAVE DATA OR PRESERVE PREVIOUS DATA
+# 7. MERGE, BOUNDARY FILTER, AND SAVE DATA
 # ============================================================
 
 if not all_data:
@@ -273,10 +271,40 @@ if not all_data:
         print("❌ No existing data available to preserve.")
         sys.exit(1)
 
-combined_df = pd.concat(all_data, ignore_index=True)
+new_df = pd.concat(all_data, ignore_index=True)
+print(f"\nNewly fetched FIRMS records across all sensors: {len(new_df):,}")
 
-# Remove duplicate coordinates/time observations
-combined_df = combined_df.drop_duplicates()
+# Merge with existing active data within rolling active window to prevent single-pass wiping
+from datetime import datetime, timezone, timedelta
+now_utc = datetime.now(timezone.utc)
+active_window_days = max(DAY_RANGE, 3)
+cutoff_date = (now_utc - timedelta(days=active_window_days)).strftime("%Y-%m-%d")
+
+if os.path.exists(OUTPUT_FILE) and os.path.getsize(OUTPUT_FILE) > 0:
+    try:
+        existing_df = pd.read_csv(OUTPUT_FILE)
+        if not existing_df.empty and "latitude" in existing_df.columns and "acq_date" in existing_df.columns:
+            valid_existing = existing_df[existing_df["acq_date"].astype(str) >= cutoff_date].copy()
+            print(f"Retaining {len(valid_existing):,} active hotspots from rolling window (>= {cutoff_date}).")
+            combined_df = pd.concat([new_df, valid_existing], ignore_index=True)
+        else:
+            combined_df = new_df
+    except Exception as e:
+        print(f"Notice during rolling merge: {e}")
+        combined_df = new_df
+else:
+    combined_df = new_df
+
+# Deduplicate coordinates and acquisition date
+dedup_cols = ["latitude", "longitude", "acq_date"]
+if all(c in combined_df.columns for c in dedup_cols):
+    combined_df["_lat_round"] = pd.to_numeric(combined_df["latitude"], errors="coerce").round(4)
+    combined_df["_lon_round"] = pd.to_numeric(combined_df["longitude"], errors="coerce").round(4)
+    before_dedup = len(combined_df)
+    combined_df = combined_df.drop_duplicates(subset=["_lat_round", "_lon_round", "acq_date"]).drop(columns=["_lat_round", "_lon_round"])
+    print(f"Deduplicated detections: {before_dedup:,} -> {len(combined_df):,}")
+else:
+    combined_df = combined_df.drop_duplicates()
 
 # ============================================================
 # POINT-IN-POLYGON INDIA BOUNDARY FILTERING
@@ -291,6 +319,10 @@ if os.path.exists(BOUNDARY_FILE):
         gdf_boundary = gpd.read_file(BOUNDARY_FILE)
         boundary_geom = gdf_boundary.union_all() if hasattr(gdf_boundary, "union_all") else gdf_boundary.unary_union
 
+        combined_df["latitude"] = pd.to_numeric(combined_df["latitude"], errors="coerce")
+        combined_df["longitude"] = pd.to_numeric(combined_df["longitude"], errors="coerce")
+        combined_df = combined_df.dropna(subset=["latitude", "longitude"]).copy().reset_index(drop=True)
+
         gdf_points = gpd.GeoDataFrame(
             combined_df,
             geometry=gpd.points_from_xy(combined_df["longitude"], combined_df["latitude"]),
@@ -298,16 +330,22 @@ if os.path.exists(BOUNDARY_FILE):
         )
         mask = gdf_points.intersects(boundary_geom)
         removed_count = int((~mask).sum())
-        combined_df = combined_df[mask].copy()
+        combined_df = combined_df[mask.values].copy()
 
         if "geometry" in combined_df.columns:
             combined_df = combined_df.drop(columns=["geometry"])
 
         print(f"✅ Filtered using {BOUNDARY_FILE}")
-        print(f"  Points inside India   : {len(combined_df)}")
-        print(f"  Points outside India  : {removed_count} (removed)")
+        print(f"  Points inside India   : {len(combined_df):,}")
+        print(f"  Points outside India  : {removed_count:,} (removed)")
     except Exception as e:
         print(f"⚠️ Boundary filtering warning: {e}")
+
+# Sort by date descending and FRP descending
+if "acq_date" in combined_df.columns and "frp" in combined_df.columns:
+    combined_df["frp"] = pd.to_numeric(combined_df["frp"], errors="coerce")
+    combined_df = combined_df.sort_values(by=["acq_date", "frp"], ascending=[False, False])
+combined_df = combined_df.reset_index(drop=True)
 
 # Save updated data
 combined_df.to_csv(OUTPUT_FILE, index=False)
@@ -316,11 +354,19 @@ print("\n" + "=" * 60)
 print("INDIA FIRMS DATA COLLECTION COMPLETE")
 print("=" * 60)
 
-print(f"Total hotspots: {len(combined_df)}")
-print(f"Saved to: {OUTPUT_FILE}")
+print(f"Total active India hotspots : {len(combined_df):,}")
+print(f"Saved to                    : {OUTPUT_FILE}")
+
+if "acq_date" in combined_df.columns:
+    print("\nDate Distribution:")
+    print(combined_df["acq_date"].value_counts().to_string())
+
+ne_count = len(combined_df[(combined_df["longitude"] >= 88.0) & (combined_df["latitude"] >= 21.5)])
+print(f"\nNortheast India hotspots    : {ne_count:,}")
 
 # ============================================================
 # 8. SUMMARY
 # ============================================================
 print_summary(combined_df)
 print("\n✅ Done!")
+

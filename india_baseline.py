@@ -113,9 +113,11 @@ def main():
             c_gdf = gpd.GeoDataFrame(current, geometry=gpd.points_from_xy(current["longitude"], current["latitude"]), crs="EPSG:4326")
             h_gdf = gpd.GeoDataFrame(historical, geometry=gpd.points_from_xy(historical["longitude"], historical["latitude"]), crs="EPSG:4326")
 
-            current = current[c_gdf.intersects(b_geom)].copy()
-            historical = historical[h_gdf.intersects(b_geom)].copy()
-            print(f"✅ Filtered using {BOUNDARY_FILE} (Current inside: {len(current)}, Historical inside: {len(historical)})")
+            c_mask = c_gdf.intersects(b_geom)
+            h_mask = h_gdf.intersects(b_geom)
+            current = current[c_mask.values].copy().reset_index(drop=True)
+            historical = historical[h_mask.values].copy().reset_index(drop=True)
+            print(f"✅ Filtered using {BOUNDARY_FILE} (Current inside: {len(current):,}, Historical inside: {len(historical):,})")
         except Exception as e:
             print(f"⚠️ Boundary filter warning: {e}")
 

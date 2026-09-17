@@ -74,7 +74,7 @@ def filter_inside_india(df_input):
     import geopandas as gpd
     gdf_p = gpd.GeoDataFrame(df_input, geometry=gpd.points_from_xy(df_input["longitude"], df_input["latitude"]), crs="EPSG:4326")
     mask = gdf_p.intersects(b_geom)
-    res = df_input[mask].copy()
+    res = df_input[mask.values].copy()
     if "geometry" in res.columns:
         res = res.drop(columns=["geometry"])
     return res.reset_index(drop=True)

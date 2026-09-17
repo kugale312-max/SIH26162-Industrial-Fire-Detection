@@ -1,12 +1,12 @@
 {
-    "evaluated_at": "2026-09-17 12:07:21 IST",
-    "accuracy": 98.16,
-    "macro_f1": 97.36,
-    "weighted_f1": 98.16,
-    "macro_precision": 97.57,
-    "macro_recall": 97.36,
-    "n_train": 2390,
-    "n_test": 598,
+    "evaluated_at": "2026-09-18 02:46:01 IST",
+    "accuracy": 97.03,
+    "macro_f1": 94.94,
+    "weighted_f1": 97.14,
+    "macro_precision": 94.25,
+    "macro_recall": 96.72,
+    "n_train": 2423,
+    "n_test": 606,
     "classes": [
         "Agricultural Burning",
         "Forest / Wildfire",
@@ -49,15 +49,15 @@
     },
     "report": {
         "Agricultural Burning": {
-            "precision": 0.985,
-            "recall": 0.9949494949494949,
-            "f1-score": 0.9899497487437185,
-            "support": 198.0
+            "precision": 0.9898477157360406,
+            "recall": 0.9605911330049262,
+            "f1-score": 0.975,
+            "support": 203.0
         },
         "Forest / Wildfire": {
-            "precision": 0.8888888888888888,
+            "precision": 0.6666666666666666,
             "recall": 1.0,
-            "f1-score": 0.9411764705882353,
+            "f1-score": 0.8,
             "support": 16.0
         },
         "Gas Flare": {
@@ -68,9 +68,9 @@
         },
         "Industrial Fire": {
             "precision": 1.0,
-            "recall": 0.8888888888888888,
-            "f1-score": 0.9411764705882353,
-            "support": 9.0
+            "recall": 0.875,
+            "f1-score": 0.9333333333333333,
+            "support": 8.0
         },
         "Mining Activity": {
             "precision": 1.0,
@@ -79,40 +79,40 @@
             "support": 46.0
         },
         "Normal Persistent Source": {
-            "precision": 0.9672131147540983,
-            "recall": 0.9915966386554622,
-            "f1-score": 0.979253112033195,
-            "support": 119.0
+            "precision": 0.9523809523809523,
+            "recall": 1.0,
+            "f1-score": 0.975609756097561,
+            "support": 120.0
         },
         "Other Thermal Event": {
-            "precision": 0.9887005649717514,
-            "recall": 0.9615384615384616,
-            "f1-score": 0.9749303621169917,
-            "support": 182.0
+            "precision": 0.9888268156424581,
+            "recall": 0.9567567567567568,
+            "f1-score": 0.9725274725274725,
+            "support": 185.0
         },
-        "accuracy": 0.9816053511705686,
+        "accuracy": 0.9702970297029703,
         "macro avg": {
-            "precision": 0.975686081230677,
-            "recall": 0.9736049076567893,
-            "f1-score": 0.973642450440195,
-            "support": 598.0
+            "precision": 0.9425317357751597,
+            "recall": 0.9672298227609859,
+            "f1-score": 0.9493545072813365,
+            "support": 606.0
         },
         "weighted avg": {
-            "precision": 0.9820971332823055,
-            "recall": 0.9816053511705686,
-            "f1-score": 0.9816093875379771,
-            "support": 598.0
+            "precision": 0.9749578022122969,
+            "recall": 0.9702970297029703,
+            "f1-score": 0.971414068169079,
+            "support": 606.0
         }
     },
     "confusion_matrix": [
         [
-            197,
+            195,
+            6,
             0,
             0,
             0,
             0,
-            0,
-            1
+            2
         ],
         [
             0,
@@ -136,7 +136,7 @@
             0,
             0,
             0,
-            8,
+            7,
             0,
             1,
             0
@@ -156,100 +156,100 @@
             0,
             0,
             0,
-            118,
-            1
+            120,
+            0
         ],
         [
-            3,
+            2,
             2,
             0,
             0,
             0,
-            2,
-            175
+            4,
+            177
         ]
     ],
     "importances": [
         {
             "Feature": "frp",
-            "Importance": 0.12509657011155922
+            "Importance": 0.13774983936900803
         },
         {
             "Feature": "dist_to_industry_km",
-            "Importance": 0.1241807676168434
+            "Importance": 0.12230651103201197
         },
         {
             "Feature": "historical_detections",
-            "Importance": 0.12337653998631813
+            "Importance": 0.1196651084478451
         },
         {
             "Feature": "dist_to_mining_km",
-            "Importance": 0.1015209938212339
+            "Importance": 0.10478566457534481
         },
         {
             "Feature": "dist_to_gas_infrastructure_km",
-            "Importance": 0.09410101578664497
+            "Importance": 0.09678383279005037
         },
         {
             "Feature": "near_gas_infra",
-            "Importance": 0.06657631611236084
-        },
-        {
-            "Feature": "baseline_frp",
-            "Importance": 0.059045376360795446
+            "Importance": 0.0656308167260733
         },
         {
             "Feature": "frp_ratio",
-            "Importance": 0.05398326938052367
+            "Importance": 0.05478084830743891
+        },
+        {
+            "Feature": "baseline_frp",
+            "Importance": 0.053348636669060256
         },
         {
             "Feature": "near_industry",
-            "Importance": 0.043710621257555975
-        },
-        {
-            "Feature": "frp_change_percent",
-            "Importance": 0.04049517793837857
-        },
-        {
-            "Feature": "frp_anomaly_score",
-            "Importance": 0.03902661386258622
-        },
-        {
-            "Feature": "near_mining",
-            "Importance": 0.031768177986426234
+            "Importance": 0.038959180053036856
         },
         {
             "Feature": "land_cover_code",
-            "Importance": 0.02706325033910551
+            "Importance": 0.03494142741114667
+        },
+        {
+            "Feature": "frp_anomaly_score",
+            "Importance": 0.03477535539423499
+        },
+        {
+            "Feature": "frp_change_percent",
+            "Importance": 0.032886598563492825
+        },
+        {
+            "Feature": "near_mining",
+            "Importance": 0.030838858239543666
         },
         {
             "Feature": "is_night",
-            "Importance": 0.017798653709978286
-        },
-        {
-            "Feature": "brightness_diff",
-            "Importance": 0.015857055727759115
+            "Importance": 0.018897215414505484
         },
         {
             "Feature": "strong_anomaly",
-            "Importance": 0.015326630338681913
+            "Importance": 0.018544731158090497
+        },
+        {
+            "Feature": "brightness_diff",
+            "Importance": 0.015658979870224805
         },
         {
             "Feature": "persistent_heat",
-            "Importance": 0.012506134725823568
+            "Importance": 0.011286408616726014
         },
         {
             "Feature": "high_frp",
-            "Importance": 0.006874458640334766
+            "Importance": 0.0064450544809759045
         },
         {
             "Feature": "new_event",
-            "Importance": 0.0009488462138455409
+            "Importance": 0.0009174468498698075
         },
         {
             "Feature": "confidence_score",
-            "Importance": 0.0007435300832448453
+            "Importance": 0.0007974860313197977
         }
     ],
-    "uncertain_samples_pct": 2.51
+    "uncertain_samples_pct": 3.8
 }

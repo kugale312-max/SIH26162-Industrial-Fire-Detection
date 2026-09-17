@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,8 +44,13 @@ jobs:
       - name: Run Pipeline
         env:
           FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
+          FIRMS_DAY_RANGE: "3"
         run: |
-          # 1. Fetch current FIRMS data
+          echo "============================================================"
+          echo "Starting Automated FireSight AI FIRMS Pipeline..."
+          echo "============================================================"
+
+          # 1. Fetch current FIRMS data (3-day rolling window & boundary filter)
           python india_firms.py
 
           # 2. Update historical baseline & persistence
@@ -52,7 +59,13 @@ jobs:
           # 3. Create AI dataset
           python india_ai_dataset.py
 
-          # 4. Generate Predictions using existing trained model
+          # 4. Ensure trained model exists
+          if [ ! -f model/india_fire_classifier.pkl ]; then
+            echo "Training AI classifier..."
+            python train_india_model.py
+          fi
+
+          # 5. Generate Predictions for every current Indian hotspot
           python predict_india_hotspots.py
 
       - name: Validate Generated Files
@@ -60,7 +73,21 @@ jobs:
           python -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" << 'EOF'
             import os
             import sys
+            import subprocess
+            from datetime import datetime, timezone, timedelta
             import pandas as pd
+
+            ist = timezone(timedelta(hours=5, minutes=30))
+            try:
+                git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+            except Exception:
+                git_sha = 'unknown'
+
+            print("============================================================")
+            print("VALIDATING PIPELINE GENERATED FILES")
+            print(f"Git Commit SHA : {git_sha}")
+            print(f"Validation Time: {datetime.now(ist).strftime('%Y-%m-%d %H:%M:%S IST')}")
+            print("============================================================")
 
             required_files = [
                 'data/firms_india.csv',
@@ -69,11 +96,13 @@ jobs:
                 'data/india_ai_predictions.csv'
             ]
 
+            dfs = {}
             for path in required_files:
                 if not os.path.exists(path):
                     print(f'::error::Required file missing: {path}')
                     sys.exit(1)
-                if os.path.getsize(path) == 0:
+                size = os.path.getsize(path)
+                if size == 0:
                     print(f'::error::Required file is empty: {path}')
                     sys.exit(1)
                 try:
@@ -81,12 +110,37 @@ jobs:
                     if len(df) == 0:
                         print(f'::error::File has no data rows: {path}')
                         sys.exit(1)
-                    print(f'[OK] Validated {path}: {len(df)} rows')
+                    mtime = datetime.fromtimestamp(os.path.getmtime(path), ist).strftime('%Y-%m-%d %H:%M:%S IST')
+                    dfs[path] = df
+                    print(f'[OK] {path:<32} Rows: {len(df):>5} | Size: {size:>8} bytes | Mtime: {mtime}')
                 except Exception as err:
                     print(f'::error::Failed to parse {path}: {err}')
                     sys.exit(1)
 
-            print('All output files successfully validated.')
+            firms_len = len(dfs['data/firms_india.csv'])
+            baseline_len = len(dfs['data/firms_india_baseline.csv'])
+            pred_len = len(dfs['data/india_ai_predictions.csv'])
+            train_len = len(dfs['data/india_ai_training.csv'])
+
+            if firms_len != baseline_len or firms_len != pred_len:
+                print(f'::error::Row count mismatch! FIRMS: {firms_len}, Baseline: {baseline_len}, Predictions: {pred_len}')
+                sys.exit(1)
+
+            pred_df = dfs['data/india_ai_predictions.csv']
+            min_lat, max_lat = pred_df['latitude'].min(), pred_df['latitude'].max()
+            min_lon, max_lon = pred_df['longitude'].min(), pred_df['longitude'].max()
+            print(f"\nHotspot Geographic Bounds: Lat [{min_lat:.3f}, {max_lat:.3f}], Lon [{min_lon:.3f}, {max_lon:.3f}]")
+
+            ne_count = len(pred_df[(pred_df['longitude'] >= 88.0) & (pred_df['latitude'] >= 21.5)])
+            print(f"Northeast India Hotspots : {ne_count}")
+
+            print("\nPipeline Row Summary:")
+            print(f"  * FIRMS Hotspots Fetched & Retained : {firms_len}")
+            print(f"  * Baseline Assessed Rows            : {baseline_len}")
+            print(f"  * AI Dataset Rows (Current+Hist)    : {train_len}")
+            print(f"  * AI Predictions Generated          : {pred_len}")
+            print("============================================================")
+            print("All generated files validated successfully!")
           EOF
 
       - name: Check for Data Changes and Update Metadata
@@ -103,10 +157,16 @@ jobs:
             python -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" << 'EOF'
             import json
             import os
+            import subprocess
             from datetime import datetime, timezone, timedelta
 
             ist = timezone(timedelta(hours=5, minutes=30))
             now_ist = datetime.now(ist)
+
+            try:
+                commit_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+            except Exception:
+                commit_sha = 'unknown'
 
             try:
                 import pandas as pd
@@ -125,6 +185,7 @@ jobs:
             meta = {
                 'updated_at': now_ist.isoformat(),
                 'updated_at_ist': now_ist.strftime('%d %b %Y, %H:%M IST'),
+                'commit_sha': commit_sha,
                 'firms_records': firms_records,
                 'india_records': india_records,
                 'industrial_fire_count': industrial_fire_count,
@@ -156,6 +217,7 @@ jobs:
             echo "No staged changes to commit."
           else
             git commit -m "Auto-update FIRMS data and AI predictions [automated]"
+            git pull --rebase origin main || true
             git push origin main
           fi
 

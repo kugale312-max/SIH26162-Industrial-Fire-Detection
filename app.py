@@ -578,16 +578,35 @@ def compute_nearest_industry(hotspots_df, _industry_df):
 
 def get_data_version():
     """
-    Return a version string based on latest modified time of data files
-    to bust Streamlit cache whenever data files are updated.
+    Return a composite version token based on file modification timestamps,
+    file sizes, and metadata updated_at to ensure Streamlit cache
+    immediately refreshes whenever new CSV data is committed or generated.
     """
     files = [
         "data/india_ai_predictions.csv",
         "data/firms_india.csv",
+        "data/firms_india_baseline.csv",
         "data/update_metadata.json"
     ]
-    mtimes = [os.path.getmtime(f) for f in files if os.path.exists(f)]
-    return str(max(mtimes)) if mtimes else "default"
+    tokens = []
+    for f in files:
+        if os.path.exists(f):
+            try:
+                st_stat = os.stat(f)
+                tokens.append(f"{f}:{st_stat.st_mtime_ns}:{st_stat.st_size}")
+            except Exception:
+                pass
+
+    metadata_path = "data/update_metadata.json"
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as meta_fp:
+                meta = json.load(meta_fp)
+                tokens.append(f"meta:{meta.get('updated_at', '')}:{meta.get('commit_sha', '')}")
+        except Exception:
+            pass
+
+    return "|".join(tokens) if tokens else "default"
 
 
 # =========================================================
@@ -758,8 +777,19 @@ def load_all_data(data_version="default"):
         ai_map["longitude_key"] = ai_map["longitude"].round(5)
 
         ai_map = ai_map.drop(columns=["latitude", "longitude"], errors="ignore")
-        firms_df = firms_df.merge(ai_map, on=["latitude_key", "longitude_key"], how="inner")
+        ai_map = ai_map.drop_duplicates(subset=["latitude_key", "longitude_key"])
+        firms_df = firms_df.merge(ai_map, on=["latitude_key", "longitude_key"], how="left")
         firms_df = firms_df.drop(columns=["latitude_key", "longitude_key"], errors="ignore")
+
+        # Fallback values for any newly added hotspot to prevent missing columns
+        if "AI Classification" in firms_df.columns:
+            firms_df["AI Classification"] = firms_df["AI Classification"].fillna("Other Thermal Event")
+        if "AI Confidence (%)" in firms_df.columns:
+            firms_df["AI Confidence (%)"] = firms_df["AI Confidence (%)"].fillna(60.0)
+        if "Risk Level" in firms_df.columns:
+            firms_df["Risk Level"] = firms_df["Risk Level"].fillna("LOW")
+        if "Risk Score" in firms_df.columns:
+            firms_df["Risk Score"] = firms_df["Risk Score"].fillna(30.0)
 
     return df_data, ind_locs, firms_df, hist_df
 
