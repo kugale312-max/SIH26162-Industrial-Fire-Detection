@@ -609,6 +609,257 @@ def get_data_version():
     return "|".join(tokens) if tokens else "default"
 
 
+@st.cache_data(show_spinner=False)
+def categorize_osm_reference_locations(ind_locs):
+    """
+    Categorizes OSM reference features into Industry, Mining, and Gas & Energy.
+    Returns categorized dataframe with 'category' column.
+    """
+    if ind_locs is None or len(ind_locs) == 0:
+        df = pd.DataFrame(columns=["name", "latitude", "longitude", "type"])
+        df["category"] = []
+        return df
+
+    df = ind_locs.copy()
+
+    def _categorize(row):
+        t = str(row.get("type", "")).lower()
+        n = str(row.get("name", "")).lower()
+        if "mine" in t or "mining" in t or "mine" in n or "quarry" in n:
+            return "Mining"
+        elif any(k in t or k in n for k in ["power", "oil", "gas", "refinery", "petrochemical", "energy", "storage"]):
+            return "Gas & Energy"
+        else:
+            return "Industry"
+
+    df["category"] = df.apply(_categorize, axis=1)
+    return df
+
+
+def add_osm_reference_layers(map_obj, osm_df, show_ind=False, show_mine=False, show_gas=False):
+    """
+    Adds separate reference layers for OSM Industry, Mining, and Gas & Energy facilities
+    only when their corresponding UI toggles are enabled. Reference layers are hidden by default.
+    """
+    if osm_df is None or len(osm_df) == 0:
+        return
+
+    # 1. OSM Industry Reference Locations
+    if show_ind:
+        ind_df = osm_df[osm_df["category"] == "Industry"] if "category" in osm_df.columns else osm_df
+        if len(ind_df) > 0:
+            ind_points = ind_df[["latitude", "longitude"]].dropna().values.tolist()
+            FastMarkerCluster(
+                data=ind_points,
+                name="🏭 OSM Industry Reference Locations",
+                control=True
+            ).add_to(map_obj)
+
+    # 2. OSM Mining Reference Locations
+    if show_mine and "category" in osm_df.columns:
+        mine_df = osm_df[osm_df["category"] == "Mining"]
+        if len(mine_df) > 0:
+            mine_group = folium.FeatureGroup(name="⛏️ OSM Mining Reference Locations")
+            for _, r in mine_df.iterrows():
+                try:
+                    folium.CircleMarker(
+                        location=[float(r["latitude"]), float(r["longitude"])],
+                        radius=5,
+                        color="#a78bfa",
+                        fill=True,
+                        fill_color="#a78bfa",
+                        fill_opacity=0.8,
+                        tooltip=f"⛏️ Mining Location: {r.get('name', 'Unnamed Mine/Quarry')}"
+                    ).add_to(mine_group)
+                except Exception:
+                    pass
+            mine_group.add_to(map_obj)
+
+    # 3. OSM Gas & Energy Infrastructure
+    if show_gas and "category" in osm_df.columns:
+        gas_df = osm_df[osm_df["category"] == "Gas & Energy"]
+        if len(gas_df) > 0:
+            gas_group = folium.FeatureGroup(name="⛽ OSM Gas & Power Infrastructure")
+            for _, r in gas_df.iterrows():
+                try:
+                    folium.CircleMarker(
+                        location=[float(r["latitude"]), float(r["longitude"])],
+                        radius=4,
+                        color="#ff9f1c",
+                        fill=True,
+                        fill_color="#ff9f1c",
+                        fill_opacity=0.7,
+                        tooltip=f"⛽ Gas/Power Infrastructure: {r.get('name', 'Unnamed Facility')}"
+                    ).add_to(gas_group)
+                except Exception:
+                    pass
+            gas_group.add_to(map_obj)
+
+
+# =========================================================
+# HOTSPOT POPUP BUILDER  (single source of truth)
+# =========================================================
+
+def build_hotspot_popup_html(row, hotspot_id=None, risk_color_map=None, class_color_map=None):
+    """
+    Build a complete, richly-formatted Folium popup HTML string for a FIRMS hotspot row.
+    Shows all key fields: coordinates, FRP, FIRMS confidence, satellite, date/time,
+    day/night, AI classification & confidence, risk level & score, baseline FRP,
+    FRP change, historical detections, persistence status, nearest industry,
+    distance, obs count, land-cover context, and scientific transparency note.
+    """
+    if risk_color_map is None:
+        risk_color_map = {"HIGH": "#ff3b46", "MEDIUM": "#f2a93b", "LOW": "#2fd0a6"}
+    if class_color_map is None:
+        class_color_map = {
+            "Industrial Fire":          "#ff5a3c",
+            "Gas Flare":                "#ff9f1c",
+            "Forest / Wildfire":        "#4dde7e",
+            "Agricultural Burning":     "#f2e94e",
+            "Mining Activity":          "#a78bfa",
+            "Normal Persistent Source": "#38bdf8",
+            "Other Thermal Event":      "#2fd0a6",
+        }
+
+    ai_class  = str(row.get("AI Classification") or row.get("ai_classification") or "Unknown")
+    ai_conf   = row.get("AI Confidence (%)") or row.get("ai_confidence")
+    risk_lvl  = str(row.get("Risk Level") or row.get("final_risk_category") or row.get("risk_category") or "UNKNOWN").upper()
+    risk_sc   = row.get("Risk Score") or row.get("final_risk_score") or row.get("risk_score")
+    frp       = row.get("frp")
+    baseline  = row.get("baseline_frp")
+    chg       = row.get("frp_change_percent")
+    dets      = row.get("detections") or row.get("historical_detections") or 0
+    persist   = row.get("persistence_status", "Unknown")
+    sat       = row.get("satellite", "N/A")
+    conf_raw  = str(row.get("confidence", "n")).lower()
+    conf_lbl  = {"h": "High", "n": "Nominal", "l": "Low"}.get(conf_raw, "Unknown")
+    date_val  = row.get("acq_date", "Unknown")
+    time_val  = row.get("acq_time", "Unknown")
+    daynight  = row.get("daynight", "Unknown")
+    land_cov  = row.get("land_cover_context", "")
+    near_fac  = str(row.get("Nearest Industrial Facility") or row.get("nearest_industrial_facility") or "Not available")
+    near_dist = row.get("Distance to Industry (km)") or row.get("dist_to_industry_km")
+    obs_cnt   = int(row.get("obs_3day_count", 1))
+
+    thermal_symbol = {
+        "Industrial Fire":          "🔥",
+        "Gas Flare":                "🕯",
+        "Forest / Wildfire":        "🌲",
+        "Agricultural Burning":     "🌾",
+        "Mining Activity":          "⛏",
+        "Normal Persistent Source": "🏭",
+        "Other Thermal Event":      "☀",
+    }.get(ai_class, "◉")
+
+    risk_clr  = risk_color_map.get(risk_lvl, "#8b96aa")
+    class_clr = class_color_map.get(ai_class, "#8b96aa")
+
+    def _fmt_frp(v):
+        try:
+            return f"{float(v):.2f} MW" if v is not None and str(v) not in ("", "nan") else "Unavailable"
+        except Exception:
+            return "Unavailable"
+
+    def _fmt_pct(v):
+        try:
+            return f"{float(v):+.1f}%" if v is not None and str(v) not in ("", "nan") else "—"
+        except Exception:
+            return "—"
+
+    def _fmt_conf(v):
+        try:
+            return f"{float(v):.1f}%" if v is not None and str(v) not in ("", "nan") else "—"
+        except Exception:
+            return "—"
+
+    def _fmt_dist(v):
+        try:
+            return f"{float(v):.2f} km" if v is not None and str(v) not in ("", "nan") else "N/A"
+        except Exception:
+            return "N/A"
+
+    def _fmt_score(v):
+        try:
+            return f"{float(v):.0f}/100" if v is not None and str(v) not in ("", "nan") else "—"
+        except Exception:
+            return "—"
+
+    id_label = f"#{hotspot_id}" if hotspot_id is not None else ""
+
+    # ---- Row helper (icon + label + value) ----
+    def _row(icon, label, value, color="#334155"):
+        return (
+            f'<div style="display:flex;justify-content:space-between;align-items:flex-start;'
+            f'padding:3px 0;border-bottom:1px solid #e8edf3;">'
+            f'<span style="color:#475569;font-size:11px;white-space:nowrap;margin-right:6px;">'
+            f'{icon} {label}</span>'
+            f'<span style="font-weight:600;font-size:11px;color:{color};'
+            f'text-align:right;word-break:break-word;max-width:160px;">{value}</span>'
+            f'</div>'
+        )
+
+    def _section(label):
+        return (
+            f'<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;'
+            f'letter-spacing:.6px;padding:5px 0 2px;margin-top:4px;'
+            f'border-bottom:2px solid #e2e8f0;">{label}</div>'
+        )
+
+    html = (
+        f'<div style="font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.4;'
+        f'color:#1e293b;min-width:260px;max-width:320px;padding:4px;">'
+        # Header
+        f'<div style="background:linear-gradient(135deg,{class_clr}22,{class_clr}11);'
+        f'border-left:4px solid {class_clr};border-radius:4px;padding:8px 10px;margin-bottom:6px;">'
+        f'<div style="font-weight:700;font-size:13px;color:#0f172a;">'
+        f'{thermal_symbol} {ai_class}</div>'
+        f'<div style="font-size:10px;color:#64748b;margin-top:2px;">'
+        f'NASA FIRMS Thermal Hotspot {id_label}</div>'
+        f'</div>'
+        # Identification
+        + _section("📍 Location & Identification")
+        + _row("📍", "Latitude", f"{float(row.get('latitude', 0)):.5f}")
+        + _row("📍", "Longitude", f"{float(row.get('longitude', 0)):.5f}")
+        + _row("🛰", "Satellite", str(sat))
+        + _row("🔬", "FIRMS Confidence", f"{conf_lbl} ({conf_raw.upper()})")
+        # Thermal
+        + _section("🔥 Thermal Measurement")
+        + _row("⚡", "Current FRP", _fmt_frp(frp), "#dc2626")
+        + _row("📊", "30-Day Baseline FRP", _fmt_frp(baseline))
+        + _row("📈", "FRP Change", _fmt_pct(chg), "#d97706" if chg and float(chg or 0) > 0 else "#16a34a")
+        # Observation
+        + _section("📅 Observation Window")
+        + _row("📅", "Acquisition Date", str(date_val))
+        + _row("⏰", "UTC Time", str(time_val))
+        + _row("🌗", "Day / Night", str(daynight))
+        + _row("🔁", "3-Day Obs Count", str(obs_cnt))
+        # AI Assessment
+        + _section("🤖 AI Assessment")
+        + _row("🎯", "AI Classification", ai_class, class_clr)
+        + _row("📊", "AI Confidence", _fmt_conf(ai_conf))
+        + _row("⚠️", "Risk Level", risk_lvl, risk_clr)
+        + _row("🎲", "Risk Score", _fmt_score(risk_sc))
+        # Historical
+        + _section("📂 Historical Analysis")
+        + _row("🔢", "Historical Detections", str(int(float(dets)) if dets else 0))
+        + _row("♾", "Persistence Status", str(persist))
+        # Industry Proximity
+        + _section("🏭 Industrial Proximity")
+        + _row("🏭", "Nearest Industry", near_fac[:40] + ("…" if len(str(near_fac)) > 40 else ""))
+        + _row("📏", "Distance", _fmt_dist(near_dist))
+        # Land Cover
+        + _section("🌍 Land-Cover Context")
+        + _row("🗺", "Land-Cover Category", str(land_cov) if land_cov else "Not available")
+        # Footer
+        + '<div style="font-size:9.5px;color:#94a3b8;margin-top:8px;padding-top:4px;'
+        + 'border-top:1px solid #e2e8f0;line-height:1.4;">'
+        + '⚠ FireSight AI results are decision support, not confirmed fire incidents. '
+        + 'Source: NASA FIRMS VIIRS NRT · OpenStreetMap · AI (Random Forest)</div>'
+        + '</div>'
+    )
+    return html
+
+
 # =========================================================
 # CACHED DATA INGESTION & PIPELINE
 # =========================================================
@@ -638,17 +889,11 @@ def load_all_data(data_version="default"):
     else:
         ind_locs = pd.DataFrame(columns=["name", "latitude", "longitude", "type"])
 
-    # 3. India current FIRMS
-    if pd.io.common.file_exists(INDIA_FIRMS_FILE):
-        firms_df = pd.read_csv(INDIA_FIRMS_FILE)
-        firms_df["latitude"] = pd.to_numeric(firms_df["latitude"], errors="coerce")
-        firms_df["longitude"] = pd.to_numeric(firms_df["longitude"], errors="coerce")
-        firms_df["frp"] = pd.to_numeric(firms_df["frp"], errors="coerce")
-        firms_df = firms_df.dropna(subset=["latitude", "longitude"]).copy()
-    else:
-        firms_df = pd.DataFrame()
+    ind_locs = categorize_osm_reference_locations(ind_locs)
 
-    # 4. Historical FIRMS (30-day baseline)
+    # 3. India current FIRMS & historical FIRMS
+    firms_df = df_data.copy()
+
     if pd.io.common.file_exists(HISTORICAL_FILE):
         hist_df = pd.read_csv(HISTORICAL_FILE)
         hist_df["latitude"] = pd.to_numeric(hist_df["latitude"], errors="coerce")
@@ -745,53 +990,64 @@ def load_all_data(data_version="default"):
         df_data["state"] = df_data.apply(
             lambda r: assign_state(r["latitude"], r["longitude"]), axis=1
         )
-
-    if len(firms_df) > 0 and "state" not in firms_df.columns:
-        firms_df["state"] = firms_df.apply(
-            lambda r: assign_state(r["latitude"], r["longitude"]), axis=1
-        )
-
-    # Merge AI predictions into firms observations
-    if len(firms_df) > 0 and len(df_data) > 0:
-        pred_cols = [
-            "latitude", "longitude",
-            "AI Classification", "AI Confidence (%)",
-            "Risk Score", "Risk Level",
-            "baseline_frp", "frp_change_percent",
-            "detections", "final_risk_score",
-            "final_risk_category",
-            "Nearest Industrial Facility",
-            "Distance to Industry (km)",
-            "near_industry",
-            "is_uncertain",
-            "uncertainty_flag",
-            "secondary_class",
-            "prediction_margin",
-        ]
-        pred_cols = [c for c in pred_cols if c in df_data.columns]
-        ai_map = df_data[pred_cols].copy()
-
-        firms_df["latitude_key"] = firms_df["latitude"].round(5)
-        firms_df["longitude_key"] = firms_df["longitude"].round(5)
-        ai_map["latitude_key"] = ai_map["latitude"].round(5)
-        ai_map["longitude_key"] = ai_map["longitude"].round(5)
-
-        ai_map = ai_map.drop(columns=["latitude", "longitude"], errors="ignore")
-        ai_map = ai_map.drop_duplicates(subset=["latitude_key", "longitude_key"])
-        firms_df = firms_df.merge(ai_map, on=["latitude_key", "longitude_key"], how="left")
-        firms_df = firms_df.drop(columns=["latitude_key", "longitude_key"], errors="ignore")
-
-        # Fallback values for any newly added hotspot to prevent missing columns
-        if "AI Classification" in firms_df.columns:
-            firms_df["AI Classification"] = firms_df["AI Classification"].fillna("Other Thermal Event")
-        if "AI Confidence (%)" in firms_df.columns:
-            firms_df["AI Confidence (%)"] = firms_df["AI Confidence (%)"].fillna(60.0)
-        if "Risk Level" in firms_df.columns:
-            firms_df["Risk Level"] = firms_df["Risk Level"].fillna("LOW")
-        if "Risk Score" in firms_df.columns:
-            firms_df["Risk Score"] = firms_df["Risk Score"].fillna(30.0)
+    if "state" not in firms_df.columns:
+        firms_df["state"] = df_data["state"]
 
     return df_data, ind_locs, firms_df, hist_df
+
+
+@st.cache_data(show_spinner=False)
+def get_map_display_data(df, data_version="default"):
+    """
+    Groups 3-day FIRMS observations by spatial location key (coordinate rounding
+    to 3 decimal places / ~100m grid) and selects the latest detection record per hotspot location.
+    Prevents rendering thousands of repeated individual markers on Folium maps while preserving
+    the full 3-day dataset for analytics and baseline calculations.
+    """
+    if df is None or len(df) == 0:
+        return pd.DataFrame()
+
+    df_map = df.copy()
+
+    # Numeric coordinate parsing
+    df_map["lat_num"] = pd.to_numeric(df_map["latitude"], errors="coerce")
+    df_map["lon_num"] = pd.to_numeric(df_map["longitude"], errors="coerce")
+    df_map = df_map.dropna(subset=["lat_num", "lon_num"]).copy()
+
+    # Spatial grouping keys (3 decimal places ~ 100m)
+    df_map["_spatial_lat"] = df_map["lat_num"].round(3)
+    df_map["_spatial_lon"] = df_map["lon_num"].round(3)
+
+    # Convert date/time to datetime for latest observation selection
+    if "acq_time" in df_map.columns:
+        df_map["_acq_time_clean"] = pd.to_numeric(df_map["acq_time"], errors="coerce").fillna(0).astype(int)
+    else:
+        df_map["_acq_time_clean"] = 0
+
+    if "acq_date" in df_map.columns:
+        df_map["_dt_sort"] = pd.to_datetime(df_map["acq_date"], errors="coerce") + pd.to_timedelta(df_map["_acq_time_clean"], unit="m")
+    else:
+        df_map["_dt_sort"] = pd.Timestamp.min
+
+    # Sort descending so the latest active observation per location comes first
+    df_map = df_map.sort_values("_dt_sort", ascending=False)
+
+    # Calculate count of 3-day observations at each physical location
+    obs_counts = df_map.groupby(["_spatial_lat", "_spatial_lon"]).size().to_dict()
+
+    # Deduplicate by spatial location
+    dedup = df_map.drop_duplicates(subset=["_spatial_lat", "_spatial_lon"]).copy()
+
+    # Attach observation count metadata
+    dedup["obs_3day_count"] = dedup.apply(
+        lambda r: obs_counts.get((r["_spatial_lat"], r["_spatial_lon"]), 1), axis=1
+    )
+
+    # Drop temporary helper columns
+    drop_cols = ["_spatial_lat", "_spatial_lon", "_acq_time_clean", "_dt_sort", "lat_num", "lon_num"]
+    dedup = dedup.drop(columns=[c for c in drop_cols if c in dedup.columns], errors="ignore")
+
+    return dedup
 
 
 try:
@@ -1174,12 +1430,16 @@ with st.sidebar:
 
     st.divider()
 
+    n_ind = len(industrial_locations[industrial_locations["category"] == "Industry"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else len(industrial_locations)
+    n_mine = len(industrial_locations[industrial_locations["category"] == "Mining"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+    n_gas = len(industrial_locations[industrial_locations["category"] == "Gas & Energy"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+
     st.markdown(
         f"""
-        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> NASA FIRMS data loaded</div>
-        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> India AI hotspots: {len(india_firms)}</div>
-        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> OSM industrial layer: reference only</div>
-        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> AI model ready</div>
+        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> Satellite FIRMS Hotspots: {len(india_firms)}</div>
+        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> Industry Ref Locations: {n_ind}</div>
+        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> Mining Ref Locations: {n_mine}</div>
+        <div class="sidebar-status-row"><span class="sidebar-status-dot"></span> Gas/Power Ref Locations: {n_gas}</div>
         """,
         unsafe_allow_html=True
     )
@@ -1425,7 +1685,7 @@ if "Dashboard" in page or "Overview" in page:
         """
         <div class="section-head">
             <div class="section-title">India-wide active detections &amp; risk</div>
-            <div class="section-tag">INDIA · FIRMS 1-DAY</div>
+            <div class="section-tag">INDIA · FIRMS 3-DAY ROLLING WINDOW</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1436,14 +1696,31 @@ if "Dashboard" in page or "Overview" in page:
         "Select a hotspot below the map for the full geospatial assessment."
     )
 
-    # Map view mode toggle
-    map_mode = st.radio(
-        "Map layer",
-        ["📍 Markers", "🔥 Heatmap", "📍 + 🔥 Both"],
-        horizontal=True,
-        index=0,
-        key="map_mode_radio"
-    )
+    # Map layer & reference layer controls
+    ctrl_col1, ctrl_col2 = st.columns([1, 2])
+
+    with ctrl_col1:
+        map_mode = st.radio(
+            "Display Mode",
+            ["📍 Markers", "🔥 Heatmap", "📍 + 🔥 Both"],
+            horizontal=True,
+            index=0,
+            key="map_mode_radio"
+        )
+
+    with ctrl_col2:
+        st.markdown("**Map Reference Infrastructure Layers**")
+        tc1, tc2, tc3, tc4 = st.columns(4)
+        with tc1:
+            show_firms_toggle = st.checkbox("🔥 Show Hotspots", value=True, key="toggle_firms_overview")
+        with tc2:
+            show_ind_toggle = st.checkbox("🏭 Show Industry Locations", value=False, key="toggle_ind_overview")
+        with tc3:
+            show_mine_toggle = st.checkbox("⛏️ Show Mining Locations", value=False, key="toggle_mine_overview")
+        with tc4:
+            show_gas_toggle = st.checkbox("⛽ Show Gas Infrastructure", value=False, key="toggle_gas_overview")
+
+    st.caption("Only NASA FIRMS hotspots are displayed by default. Enable reference layers to view nearby industry, mining, or gas infrastructure locations.")
 
     # India-wide FIRMS map
     # Complete Indian territory bounding box (including Northeast and Islands)
@@ -1495,71 +1772,63 @@ if "Dashboard" in page or "Overview" in page:
         control=True
     ).add_to(m)
 
-    # OSM industrial points (clustered with FastMarkerCluster for 100x faster sub-second map rendering)
-    if len(industrial_locations) > 0:
-        ind_points = industrial_locations[["latitude", "longitude"]].dropna().values.tolist()
-        FastMarkerCluster(
-            data=ind_points,
-            name="OSM Industrial Facilities",
-            control=True
+    # Map view notice banner & summary count labels
+    n_ind = len(industrial_locations[industrial_locations["category"] == "Industry"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else len(industrial_locations)
+    n_mine = len(industrial_locations[industrial_locations["category"] == "Mining"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+    n_gas = len(industrial_locations[industrial_locations["category"] == "Gas & Energy"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+
+    st.markdown(
+        f"""
+        <div style="background:#0e131b;border:1px solid #202a38;border-left:4px solid #4c8dff;
+                    border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#8b96aa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <span style="color:#e7edf6;font-weight:600;">ℹ️ Data Isolation Note:</span> 
+                    Satellite FIRMS hotspots are counted and analyzed independently from OSM reference infrastructure.
+                </div>
+                <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap;">
+                    <span style="color:#ff5a3c;background:#1a1012;padding:2px 8px;border-radius:4px;border:1px solid #381a1c;">
+                        🔥 Satellite Hotspots: <b>{len(filtered_data)}</b>
+                    </span>
+                    <span style="color:#4c8dff;background:#0d1524;padding:2px 8px;border-radius:4px;border:1px solid #1a2a44;">
+                        🏭 Industry Ref: <b>{n_ind}</b>
+                    </span>
+                    <span style="color:#a78bfa;background:#171324;padding:2px 8px;border-radius:4px;border:1px solid #2a2044;">
+                        ⛏️ Mining Ref: <b>{n_mine}</b>
+                    </span>
+                    <span style="color:#ff9f1c;background:#241b0d;padding:2px 8px;border-radius:4px;border:1px solid #44321a;">
+                        ⛽ Gas/Power Ref: <b>{n_gas}</b>
+                    </span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # ---- Map layer mode ----
+    show_heatmap = (map_mode in ["🔥 Heatmap", "📍 + 🔥 Both"]) and show_firms_toggle
+    show_markers = (map_mode in ["📍 Markers", "📍 + 🔥 Both"]) and show_firms_toggle
+
+    # Deduplicated display dataset containing latest active detection per location
+    map_display_df = get_map_display_data(filtered_data, get_data_version())
+
+    # Marker layer — only rendered when mode includes markers and FIRMS toggle is enabled.
+    if show_markers and len(map_display_df) > 0:
+        marker_cluster = MarkerCluster(
+            name="🔥 Satellite FIRMS Hotspots",
+            control=True,
+            options={
+                "disableClusteringAtZoom": 14,
+                "spiderfyOnMaxZoom": True
+            }
         ).add_to(m)
 
-    # India FIRMS hotspots
-    # Current FIRMS detections merged with AI predictions.
-    # Clicking a marker shows the AI assessment directly.
-    # Build the visible map dataset from the filtered AI dataframe.
-    # Match by rounded coordinates so current FIRMS rows and AI predictions
-    # remain aligned even when column names differ.
-    visible_coords = set()
-
-    lat_col = "Latitude" if "Latitude" in filtered_data.columns else "latitude"
-    lon_col = "Longitude" if "Longitude" in filtered_data.columns else "longitude"
-
-    if lat_col in filtered_data.columns and lon_col in filtered_data.columns:
-        visible_coords = set(
-            zip(
-                pd.to_numeric(filtered_data[lat_col], errors="coerce").round(5),
-                pd.to_numeric(filtered_data[lon_col], errors="coerce").round(5)
-            )
-        )
-
-    # ---- Map layer mode (set by the radio toggle above) ----
-    show_heatmap = map_mode in ["🔥 Heatmap", "📍 + 🔥 Both"]
-    show_markers = map_mode in ["📍 Markers", "📍 + 🔥 Both"]
-
-    # Marker layer — only rendered when mode includes markers.
-    if show_markers:
-        for hotspot_idx, (_, row) in enumerate(india_firms.iterrows()):
-
-            coord_key = (
-                round(float(row["latitude"]), 5),
-                round(float(row["longitude"]), 5)
-            )
-
-            if visible_coords and coord_key not in visible_coords:
-                continue
-
-
-
+        for hotspot_idx, (_, row) in enumerate(map_display_df.iterrows()):
             confidence = str(row.get("confidence", "n")).lower()
 
-            # Convert the FIRMS confidence code into a readable label.
-            confidence_label = {
-                "l": "Low",
-                "n": "Nominal",
-                "h": "High"
-            }.get(confidence, "Unknown")
-
-            # Use final AI risk color on the India map when available.
             ai_risk = str(row.get("Risk Level", "")).upper()
-            confidence_color = RISK_COLOR.get(
-                ai_risk,
-                {
-                    "h": "#ff3b46",
-                    "n": "#f2a93b",
-                    "l": "#2fd0a6"
-                }.get(confidence, "#8b96aa")
-            )
+            thermal_border = RISK_COLOR.get(ai_risk, "#8b96aa")
 
             frp_value = row.get("frp", float("nan"))
             frp_text = (
@@ -1568,12 +1837,10 @@ if "Dashboard" in page or "Overview" in page:
                 else "Unavailable"
             )
 
-            satellite = row.get("satellite", "Unknown")
             date_value = row.get("acq_date", "Unknown")
             time_value = row.get("acq_time", "Unknown")
+            obs_cnt = int(row.get("obs_3day_count", 1))
 
-            # Distinctive thermal hotspot icon.
-            # Symbol identifies the AI class; ring identifies the risk level.
             thermal_symbol = {
                 "Industrial Fire":          "🔥",
                 "Gas Flare":                "🕯",
@@ -1587,159 +1854,54 @@ if "Dashboard" in page or "Overview" in page:
                 "◉"
             )
 
-            thermal_border = {
-                "HIGH": "#ff3b46",
-                "MEDIUM": "#f2a93b",
-                "LOW": "#2fd0a6"
-            }.get(
-                ai_risk,
-                "#8b96aa"
-            )
-
             is_selected = (
                 st.session_state.get("selected_india_hotspot") is not None
                 and hotspot_idx == st.session_state.get("selected_india_hotspot")
             )
-            marker_size = 40 if is_selected else 34
+            marker_size = 38 if is_selected else 32
             marker_border = "#ffffff" if is_selected else thermal_border
-            marker_shadow = f"0 0 18px 6px {thermal_border}, 0 0 8px #ffffff" if is_selected else f"0 0 12px {thermal_border}"
-            marker_z = "z-index: 10000;" if is_selected else ""
+            marker_shadow = f"0 0 16px 4px {thermal_border}" if is_selected else f"0 0 8px {thermal_border}"
 
             thermal_icon = folium.DivIcon(
                 html=f"""
-                <div title="Thermal hotspot #{hotspot_idx}{' (Selected)' if is_selected else ''}"
+                <div title="Hotspot #{hotspot_idx}"
                      style="
                         width:{marker_size}px;
                         height:{marker_size}px;
-                        border:{3.5 if is_selected else 3}px solid {marker_border};
+                        border:3px solid {marker_border};
                         border-radius:50%;
-                        background:rgba(9,12,17,0.96);
+                        background:rgba(9,12,17,0.95);
                         box-shadow:{marker_shadow};
                         display:flex;
                         align-items:center;
                         justify-content:center;
                         transform:translate(-50%,-50%);
-                        font-size:{21 if is_selected else 18}px;
+                        font-size:{19 if is_selected else 16}px;
                         line-height:{marker_size}px;
                         text-align:center;
                         font-family:Arial,sans-serif;
-                        {marker_z}
                      ">
                     {thermal_symbol}
                 </div>
                 """
             )
 
+            popup_html = build_hotspot_popup_html(
+                row,
+                hotspot_id=hotspot_idx,
+                risk_color_map=RISK_COLOR,
+                class_color_map=CLASS_COLOR
+            )
+
             folium.Marker(
-                location=[
-                    row["latitude"],
-                    row["longitude"]
-                ],
+                location=[float(row["latitude"]), float(row["longitude"])],
                 icon=thermal_icon,
+                tooltip=f"{thermal_symbol} {row.get('AI Classification', 'Hotspot')} | Risk: {ai_risk} | FRP: {frp_text}",
+                popup=folium.Popup(popup_html, max_width=340)
+            ).add_to(marker_cluster)
 
-                tooltip=folium.Tooltip(
-                    f"""
-                    <div style="
-                        min-width:300px;
-                        max-width:360px;
-                        font-family:Arial,sans-serif;
-                        font-size:12px;
-                        line-height:1.45;
-                        color:#17202a;
-                    ">
-                        <div style="
-                            font-size:15px;
-                            font-weight:700;
-                            margin-bottom:7px;
-                        ">
-                            🔥 NASA FIRMS Hotspot #{hotspot_idx}
-                        </div>
-
-                        <b>📍 Coordinates:</b>
-                        {float(row["latitude"]):.5f},
-                        {float(row["longitude"]):.5f}<br>
-
-                        <b>🔥 Current FRP:</b> {frp_text}<br>
-
-                        <b>🎯 FIRMS Confidence:</b>
-                        {confidence.upper()} · {confidence_label}<br>
-
-                        <b>🛰️ Satellite:</b> {satellite}<br>
-
-                        <b>📅 Acquisition:</b>
-                        {date_value} · {time_value} UTC<br>
-
-                        <b>☀️ Day/Night:</b>
-                        {row.get("daynight", "Unknown")}<br>
-
-                        <hr style="margin:6px 0;border:0;border-top:1px solid #d8dde3;">
-
-                        <b>🤖 AI Classification:</b>
-                        {row.get("AI Classification", "Unavailable")}<br>
-
-                        <b>AI Confidence:</b>
-                        {(
-                            f"{float(row.get('AI Confidence (%)')):.2f}%"
-                            if pd.notna(row.get("AI Confidence (%)"))
-                            else "Unavailable"
-                        )}<br>
-
-                        <b>⚠️ Risk:</b>
-                        {row.get("Risk Level", "Unavailable")} ·
-                        {(
-                            f"{float(row.get('Risk Score')):.0f}/100"
-                            if pd.notna(row.get("Risk Score"))
-                            else "Score unavailable"
-                        )}<br>
-
-                        <b>📊 30-Day Baseline:</b>
-                        {(
-                            f"{float(row.get('baseline_frp')):.2f} MW"
-                            if pd.notna(row.get("baseline_frp"))
-                            else "No local baseline"
-                        )}<br>
-
-                        <b>📈 FRP Change:</b>
-                        {(
-                            f"{float(row.get('frp_change_percent')):+.2f}%"
-                            if pd.notna(row.get("frp_change_percent"))
-                            else "Unavailable"
-                        )}<br>
-
-                        <b>🔁 Historical Detections:</b>
-                        {int(row.get("detections", 0))}<br>
-
-                        <hr style="margin:6px 0;border:0;border-top:1px solid #d8dde3;">
-
-                        <b>🏭 Nearest Industry:</b>
-                        {row.get("Nearest Industrial Facility", "Not available")}<br>
-
-                        <b>📏 Distance to Industry:</b>
-                        {(
-                            f"{float(row.get('Distance to Industry (km)')):.2f} km"
-                            if pd.notna(row.get("Distance to Industry (km)"))
-                            else "Not available"
-                        )}<br>
-
-                        <b>🔗 Near Industry:</b>
-                        {row.get("near_industry", "Unknown")}<br>
-
-                        <div style="
-                            margin-top:7px;
-                            padding:6px 8px;
-                            background:#f3f5f7;
-                            border-radius:4px;
-                            font-size:11px;
-                        ">
-                            ℹ️ Select this hotspot below the map for the
-                            full geospatial context and detailed assessment.
-                        </div>
-                    </div>
-                    """,
-                    sticky=False,
-                    direction="top"
-                )
-            ).add_to(m)
+    # Add OSM reference layers AFTER FIRMS hotspots layer ONLY when enabled by user toggles
+    add_osm_reference_layers(m, industrial_locations, show_ind=show_ind_toggle, show_mine=show_mine_toggle, show_gas=show_gas_toggle)
 
     # ---- Heatmap layer (FRP-weighted) ----
     if show_heatmap and len(india_firms) > 0:
@@ -1773,7 +1935,7 @@ if "Dashboard" in page or "Overview" in page:
     map_result = st_folium(
         m,
         width=None,
-        height=540,
+        height=750,
         key="india_overview_map",
         returned_objects=[]
     )
@@ -2415,50 +2577,112 @@ elif "Detection Map" in page or "Detection Records" in page:
         control=True
     ).add_to(det_map)
 
-    if len(industrial_locations) > 0:
-        ind_points = industrial_locations[["latitude", "longitude"]].dropna().values.tolist()
-        FastMarkerCluster(
-            data=ind_points,
-            name="OSM Industrial Facilities",
-            control=True
-        ).add_to(det_map)
+    # Map layer & reference controls
+    dtc1, dtc2, dtc3, dtc4 = st.columns(4)
+    with dtc1:
+        det_show_firms = st.checkbox("🔥 Show Hotspots", value=True, key="toggle_firms_det")
+    with dtc2:
+        det_show_ind = st.checkbox("🏭 Show Industry Locations", value=False, key="toggle_ind_det")
+    with dtc3:
+        det_show_mine = st.checkbox("⛏️ Show Mining Locations", value=False, key="toggle_mine_det")
+    with dtc4:
+        det_show_gas = st.checkbox("⛽ Show Gas Infrastructure", value=False, key="toggle_gas_det")
 
-    for h_idx, (_, row) in enumerate(india_firms.iterrows()):
-        ai_r = str(row.get("Risk Level", "")).upper()
-        conf_color = RISK_COLOR.get(ai_r, "#8b96aa")
-        f_val = row.get("frp", float("nan"))
-        f_str = f"{f_val:.2f} MW" if pd.notna(f_val) else "N/A"
-        sym = {
-            "Industrial Fire":          "🔥",
-            "Gas Flare":                "🕯",
-            "Forest / Wildfire":        "🌲",
-            "Agricultural Burning":     "🌾",
-            "Mining Activity":          "⛏",
-            "Normal Persistent Source": "🏭",
-            "Other Thermal Event":      "☀"
-        }.get(str(row.get("AI Classification", "")), "◉")
+    st.caption("Only NASA FIRMS hotspots are displayed by default. Enable reference layers to view nearby industry, mining, or gas infrastructure locations.")
 
-        t_icon = folium.DivIcon(
-            html=f"""
-            <div style="width:32px;height:32px;border:2.5px solid {conf_color};border-radius:50%;
-                 background:rgba(9,12,17,0.95);box-shadow:0 0 10px {conf_color};display:flex;
-                 align-items:center;justify-content:center;transform:translate(-50%,-50%);font-size:16px;">
-                {sym}
+    # Map view notice banner & summary count labels
+    n_ind = len(industrial_locations[industrial_locations["category"] == "Industry"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else len(industrial_locations)
+    n_mine = len(industrial_locations[industrial_locations["category"] == "Mining"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+    n_gas = len(industrial_locations[industrial_locations["category"] == "Gas & Energy"]) if (industrial_locations is not None and "category" in industrial_locations.columns) else 0
+
+    st.markdown(
+        f"""
+        <div style="background:#0e131b;border:1px solid #202a38;border-left:4px solid #4c8dff;
+                    border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#8b96aa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <span style="color:#e7edf6;font-weight:600;">ℹ️ Data Isolation Note:</span> 
+                    Satellite FIRMS hotspots are counted and analyzed independently from OSM reference infrastructure.
+                </div>
+                <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-wrap:wrap;">
+                    <span style="color:#ff5a3c;background:#1a1012;padding:2px 8px;border-radius:4px;border:1px solid #381a1c;">
+                        🔥 Satellite Hotspots: <b>{len(india_firms)}</b>
+                    </span>
+                    <span style="color:#4c8dff;background:#0d1524;padding:2px 8px;border-radius:4px;border:1px solid #1a2a44;">
+                        🏭 Industry Ref: <b>{n_ind}</b>
+                    </span>
+                    <span style="color:#a78bfa;background:#171324;padding:2px 8px;border-radius:4px;border:1px solid #2a2044;">
+                        ⛏️ Mining Ref: <b>{n_mine}</b>
+                    </span>
+                    <span style="color:#ff9f1c;background:#241b0d;padding:2px 8px;border-radius:4px;border:1px solid #44321a;">
+                        ⛽ Gas/Power Ref: <b>{n_gas}</b>
+                    </span>
+                </div>
             </div>
-            """
-        )
-        folium.Marker(
-            location=[row["latitude"], row["longitude"]],
-            icon=t_icon,
-            tooltip=f"<b>Hotspot #{h_idx}</b><br>Class: {row.get('AI Classification', 'N/A')}<br>FRP: {f_str}<br>Risk: {ai_r}"
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    det_map_display = get_map_display_data(india_firms, get_data_version())
+
+    if det_show_firms and len(det_map_display) > 0:
+        det_cluster = MarkerCluster(
+            name="🔥 Satellite FIRMS Hotspots",
+            control=True,
+            options={
+                "disableClusteringAtZoom": 14,
+                "spiderfyOnMaxZoom": True
+            }
         ).add_to(det_map)
+
+        for h_idx, (_, row) in enumerate(det_map_display.iterrows()):
+            ai_r = str(row.get("Risk Level", "")).upper()
+            conf_color = RISK_COLOR.get(ai_r, "#8b96aa")
+            f_val = row.get("frp", float("nan"))
+            f_str = f"{f_val:.2f} MW" if pd.notna(f_val) else "N/A"
+            sym = {
+                "Industrial Fire":          "🔥",
+                "Gas Flare":                "🕯",
+                "Forest / Wildfire":        "🌲",
+                "Agricultural Burning":     "🌾",
+                "Mining Activity":          "⛏",
+                "Normal Persistent Source": "🏭",
+                "Other Thermal Event":      "☀"
+            }.get(str(row.get("AI Classification", "")), "◉")
+
+            t_icon = folium.DivIcon(
+                html=f"""
+                <div style="width:32px;height:32px;border:2.5px solid {conf_color};border-radius:50%;
+                     background:rgba(9,12,17,0.95);box-shadow:0 0 10px {conf_color};display:flex;
+                     align-items:center;justify-content:center;transform:translate(-50%,-50%);font-size:16px;">
+                    {sym}
+                </div>
+                """
+            )
+            det_popup_html = build_hotspot_popup_html(
+                row,
+                hotspot_id=h_idx,
+                risk_color_map=RISK_COLOR,
+                class_color_map=CLASS_COLOR
+            )
+
+            folium.Marker(
+                location=[float(row["latitude"]), float(row["longitude"])],
+                icon=t_icon,
+                tooltip=f"<b>Hotspot #{h_idx}</b><br>Class: {row.get('AI Classification', 'N/A')}<br>FRP: {f_str}<br>Risk: {ai_r}",
+                popup=folium.Popup(det_popup_html, max_width=340)
+            ).add_to(det_cluster)
+
+    # Add OSM reference layers AFTER FIRMS hotspots layer ONLY when enabled by user toggles
+    add_osm_reference_layers(det_map, industrial_locations, show_ind=det_show_ind, show_mine=det_show_mine, show_gas=det_show_gas)
 
     folium.LayerControl().add_to(det_map)
 
     st_folium(
         det_map,
         width=None,
-        height=560,
+        height=750,
         key="detection_map_view",
         returned_objects=[]
     )
