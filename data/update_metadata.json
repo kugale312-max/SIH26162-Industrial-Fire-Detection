@@ -1,9 +1,9 @@
 {
-    "updated_at": "2026-10-23T10:56:46.411212+05:30",
-    "updated_at_ist": "23 Oct 2026, 10:56 IST",
-    "commit_sha": "8ea8d89fd6df5050138218ce42650d0082e0cd3b",
-    "firms_records": 8469,
-    "india_records": 8469,
-    "industrial_fire_count": 38,
-    "high_risk_count": 10
+    "updated_at": "2026-10-23T17:41:29.712682+05:30",
+    "updated_at_ist": "23 Oct 2026, 17:41 IST",
+    "commit_sha": "f64716aef2caa5f0369ebbe305185c71058dac9a",
+    "firms_records": 9589,
+    "india_records": 9589,
+    "industrial_fire_count": 41,
+    "high_risk_count": 11
 }
