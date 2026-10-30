@@ -1,9 +1,9 @@
 {
-    "updated_at": "2026-10-30T06:52:18.561377+05:30",
-    "updated_at_ist": "30 Oct 2026, 06:52 IST",
-    "commit_sha": "605638739e1457c3822633dbd10ecbddd86ad988",
-    "firms_records": 6052,
-    "india_records": 6052,
+    "updated_at": "2026-10-30T15:59:17.357533+05:30",
+    "updated_at_ist": "30 Oct 2026, 15:59 IST",
+    "commit_sha": "7c23ce66d1de69437243f429abbf81d5416f97dc",
+    "firms_records": 7368,
+    "india_records": 7368,
     "industrial_fire_count": 2,
     "high_risk_count": 4
 }
